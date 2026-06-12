@@ -1,0 +1,4 @@
+/gen-config/certs/default.pem
+{% for d in domains -%}
+/gen-config/certs/mail.{{ d }}.pem
+{% endfor -%}

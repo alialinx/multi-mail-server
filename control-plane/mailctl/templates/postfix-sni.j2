@@ -1,0 +1,3 @@
+{% for d in domains -%}
+mail.{{ d }} /certs/live/mail.{{ d }}/privkey.pem /certs/live/mail.{{ d }}/fullchain.pem
+{% endfor -%}

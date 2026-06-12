@@ -1,0 +1,3 @@
+{% for d in domains -%}
+default._domainkey.{{ d }} {{ d }}:default:/etc/opendkim/keys/{{ d }}/default.private
+{% endfor -%}

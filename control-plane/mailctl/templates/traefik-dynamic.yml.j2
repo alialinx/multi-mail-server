@@ -1,0 +1,39 @@
+http:
+  routers:
+    acme-challenge:
+      rule: "PathPrefix(`/.well-known/acme-challenge/`)"
+      entryPoints:
+        - web
+      priority: 1000
+      service: acme-web
+    https-redirect:
+      rule: "HostRegexp(`.+`)"
+      entryPoints:
+        - web
+      priority: 1
+      service: noop@internal
+      middlewares:
+        - https-redirect
+{% for d in domains %}    mail-{{ loop.index }}:
+      rule: "Host(`mail.{{ d }}`)"
+      entryPoints:
+        - websecure
+      service: noop@internal
+      tls: {}
+{% endfor %}
+  services:
+    acme-web:
+      loadBalancer:
+        servers:
+          - url: "http://acme-web:80"
+  middlewares:
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+{% if domains %}
+tls:
+  certificates:
+{% for d in domains %}    - certFile: /certs/live/mail.{{ d }}/fullchain.pem
+      keyFile: /certs/live/mail.{{ d }}/privkey.pem
+{% endfor %}{% endif %}

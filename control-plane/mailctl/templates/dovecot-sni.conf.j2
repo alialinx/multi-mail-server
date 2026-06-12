@@ -1,0 +1,6 @@
+{% for d in domains -%}
+local_name mail.{{ d }} {
+  ssl_cert = </certs/live/mail.{{ d }}/fullchain.pem
+  ssl_key = </certs/live/mail.{{ d }}/privkey.pem
+}
+{% endfor -%}

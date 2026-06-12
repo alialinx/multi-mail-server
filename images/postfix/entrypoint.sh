@@ -8,7 +8,8 @@ for f in /etc/postfix/pgsql.tmpl/*.cf; do
     envsubst '${POSTGRES_PASSWORD}' < "$f" > "/etc/postfix/pgsql/$(basename "$f")"
 done
 
-postconf -e "myhostname=${MAIL_HOSTNAME}"
+clean_hostname=$(printf '%s' "${MAIL_HOSTNAME}" | tr -cd 'a-zA-Z0-9.-')
+postconf -e "myhostname=${clean_hostname}"
 
 mkdir -p /var/log/mail
 touch /var/log/mail/postfix.log

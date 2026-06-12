@@ -80,10 +80,10 @@ Many providers block outbound port 25, which stops sending.
 Fail2ban runs on the host network with `NET_ADMIN` and `NET_RAW` so it can add firewall rules. This is a privileged container that changes the host firewall.
 - Status: **accepted**. It only bans on the public mail ports, which all arrive through HAProxy on the host. It does not cover the web or API ports. On some hosts its rules can interact with Docker's own iptables rules, so verify bans work after install.
 
-### Spam filtering is basic
-SpamAssassin runs with default rules. There is no Bayes training, no rule auto-update schedule, and no per-user threshold.
-- Status: **accepted**.
-- Planned: scheduled `sa-update`, Bayes learning from the Junk folder.
+### SpamAssassin is not enabled yet
+The Debian package used did not ship a standalone `spamd` binary, so SpamAssassin is currently not wired in.
+- Status: **planned**. Inbound spam is still reduced by postscreen and the DNS blocklists (Spamhaus, Spamcop) at SMTP time.
+- Planned: add SpamAssassin back with a working `spamd`, then Bayes training and scheduled `sa-update`.
 
 ## Not in Phase 1
 

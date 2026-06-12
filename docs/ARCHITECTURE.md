@@ -21,7 +21,6 @@ Each part runs in its own container. They are wired with one Docker network call
 | postfix | SMTP. Receives mail on 25, sends mail, submission on 465 and 587 |
 | dovecot | IMAP on 143 and 993, and LMTP for local delivery |
 | opendkim | Signs outgoing mail with DKIM |
-| spamassassin | Scans incoming mail and marks spam |
 | haproxy | The edge for mail ports. Terminates TLS for 465 and 993 |
 | traefik | The edge for web ports 80 and 443 |
 | acme-web | A tiny nginx that serves Let's Encrypt HTTP challenges |
@@ -68,7 +67,7 @@ There is one self-signed default certificate at `/certs/default`. It is the fall
 
 ## Spam filtering and bans
 
-Incoming mail goes through SpamAssassin as a Postfix milter. It adds an `X-Spam-Flag` header. A global Sieve rule (`spam.sieve`) moves flagged mail into the Junk folder. Submission ports (465, 587) skip SpamAssassin so your own users' outgoing mail is not scanned.
+Inbound spam is reduced at SMTP time by postscreen and the DNS blocklists (Spamhaus, Spamcop) in the Postfix config. A global Sieve rule (`spam.sieve`) is ready to move mail marked with `X-Spam-Flag` into the Junk folder; the SpamAssassin scanner that sets that header is planned (see [RISKS.md](RISKS.md)).
 
 Fail2ban reads the Postfix and Dovecot log files from the shared `maillog` volume and bans IPs that fail login too many times. It runs on the host network with `NET_ADMIN` so it can add firewall rules for the public mail ports. Because HAProxy forwards the real client IP with the PROXY protocol, the logs show the real IP and the bans are correct.
 

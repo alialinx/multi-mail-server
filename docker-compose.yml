@@ -28,13 +28,6 @@ services:
     networks:
       - mailnet
 
-  spamassassin:
-    build: ./images/spamassassin
-    container_name: spamassassin
-    restart: unless-stopped
-    networks:
-      - mailnet
-
   dovecot:
     build: ./images/dovecot
     container_name: dovecot
@@ -83,7 +76,6 @@ services:
       - postgres
       - dovecot
       - opendkim
-      - spamassassin
 
   haproxy:
     image: haproxy:lts

@@ -1,0 +1,5 @@
+hosts = postgres
+dbname = mailservers
+user = mailservers
+password = ${POSTGRES_PASSWORD}
+query = SELECT goto_address FROM aliases WHERE address='%s' AND active=true

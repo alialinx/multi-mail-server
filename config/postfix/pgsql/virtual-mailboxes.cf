@@ -1,0 +1,5 @@
+hosts = postgres
+dbname = mailservers
+user = mailservers
+password = ${POSTGRES_PASSWORD}
+query = SELECT CONCAT(d.name, '/', split_part(u.email, '@', 1), '/Maildir/') FROM users u JOIN domains d ON u.domain_id = d.id WHERE u.email='%s' AND u.active=true

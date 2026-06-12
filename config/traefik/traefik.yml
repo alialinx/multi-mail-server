@@ -1,0 +1,18 @@
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  file:
+    filename: /gen-config/traefik/dynamic.yml
+    watch: true
+
+api:
+  dashboard: false
+
+log:
+  level: INFO
+
+accessLog: {}

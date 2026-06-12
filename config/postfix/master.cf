@@ -1,0 +1,55 @@
+2525      inet  n       -       n       -       1       postscreen
+smtpd     pass  -       -       n       -       -       smtpd
+dnsblog   unix  -       -       n       -       0       dnsblog
+tlsproxy  unix  -       -       n       -       0       tlsproxy
+
+pickup    unix  n       -       y       60      1       pickup
+cleanup   unix  n       -       y       -       0       cleanup
+qmgr      unix  n       -       n       300     1       qmgr
+tlsmgr    unix  -       -       y       1000?   1       tlsmgr
+rewrite   unix  -       -       y       -       -       trivial-rewrite
+bounce    unix  -       -       y       -       0       bounce
+defer     unix  -       -       y       -       0       bounce
+trace     unix  -       -       y       -       0       bounce
+verify    unix  -       -       y       -       1       verify
+flush     unix  n       -       y       1000?   0       flush
+proxymap  unix  -       -       n       -       -       proxymap
+proxywrite unix -       -       n       -       1       proxymap
+smtp      unix  -       -       y       -       -       smtp
+relay     unix  -       -       y       -       -       smtp
+showq     unix  n       -       y       -       -       showq
+error     unix  -       -       y       -       -       error
+retry     unix  -       -       y       -       -       error
+discard   unix  -       -       y       -       -       discard
+local     unix  -       n       n       -       -       local
+virtual   unix  -       n       n       -       -       virtual
+lmtp      unix  -       -       y       -       -       lmtp
+anvil     unix  -       -       y       -       1       anvil
+scache    unix  -       -       y       -       1       scache
+postlog   unix-dgram n  -       n       -       1       postlogd
+
+2587      inet  n       -       n       -       -       smtpd
+  -o syslog_name=postfix/2587
+  -o mynetworks=
+  -o smtpd_upstream_proxy_protocol=haproxy
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_tls_auth_only=yes
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_client_restrictions=
+  -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+  -o smtpd_sender_restrictions=
+  -o milter_macro_daemon_name=ORIGINATING
+
+2465      inet  n       -       n       -       -       smtpd
+  -o syslog_name=postfix/2465
+  -o mynetworks=
+  -o smtpd_upstream_proxy_protocol=haproxy
+  -o smtpd_tls_security_level=none
+  -o smtpd_tls_auth_only=no
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_client_restrictions=
+  -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+  -o smtpd_sender_restrictions=
+  -o milter_macro_daemon_name=ORIGINATING

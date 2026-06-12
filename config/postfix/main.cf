@@ -1,0 +1,73 @@
+compatibility_level = 3.6
+
+myhostname = localhost
+myorigin = $myhostname
+
+inet_interfaces = all
+inet_protocols = ipv4
+
+mydestination = localhost
+relay_domains =
+mynetworks = 127.0.0.0/8 [::1]/128
+
+virtual_mailbox_base = /home/mailservers
+virtual_mailbox_domains = pgsql:/etc/postfix/pgsql/virtual-domains.cf
+virtual_mailbox_maps = pgsql:/etc/postfix/pgsql/virtual-mailboxes.cf
+virtual_alias_maps = pgsql:/etc/postfix/pgsql/virtual-aliases.cf
+
+virtual_uid_maps = static:5000
+virtual_gid_maps = static:5000
+virtual_minimum_uid = 5000
+
+virtual_transport = lmtp:inet:dovecot:24
+lmtp_destination_recipient_limit = 1
+
+smtpd_banner = $myhostname ESMTP
+biff = no
+append_dot_mydomain = no
+readme_directory = no
+
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
+smtpd_recipient_restrictions =
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    reject_non_fqdn_recipient,
+    reject_unknown_recipient_domain,
+    reject_unauth_destination
+
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = inet:dovecot:12345
+smtpd_sasl_auth_enable = yes
+broken_sasl_auth_clients = yes
+
+smtpd_tls_security_level = may
+smtp_tls_security_level = may
+smtpd_tls_auth_only = yes
+smtpd_tls_loglevel = 1
+smtpd_tls_received_header = yes
+
+smtpd_tls_chain_files = /certs/default/privkey.pem, /certs/default/fullchain.pem
+tls_server_sni_maps = hash:/gen-config/postfix/sni
+
+smtpd_milters = inet:opendkim:8891
+non_smtpd_milters = inet:opendkim:8891
+milter_default_action = accept
+milter_protocol = 6
+
+smtpd_helo_required = yes
+smtpd_helo_restrictions =
+    reject_invalid_helo_hostname,
+    reject_non_fqdn_helo_hostname
+
+smtpd_delay_reject = yes
+
+anvil_rate_time_unit = 60s
+smtpd_client_connection_rate_limit = 30
+
+postscreen_upstream_proxy_protocol = haproxy
+postscreen_greet_action = enforce
+postscreen_dnsbl_action = enforce
+postscreen_dnsbl_sites = zen.spamhaus.org*2 bl.spamcop.net
+postscreen_blacklist_action = enforce
+postscreen_non_smtp_command_action = drop
+postscreen_pipelining_action = enforce

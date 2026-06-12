@@ -1,0 +1,172 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - mailnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  opendkim:
+    build: ./images/opendkim
+    container_name: opendkim
+    restart: unless-stopped
+    volumes:
+      - dkim-keys:/etc/opendkim/keys
+      - gen-config:/gen-config:ro
+      - ./config/opendkim/opendkim.conf:/etc/opendkim/opendkim.conf:ro
+    networks:
+      - mailnet
+
+  dovecot:
+    build: ./images/dovecot
+    container_name: dovecot
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - maildata:/home/mailservers
+      - sievedata:/var/sieve
+      - certs:/certs:ro
+      - gen-config:/gen-config:ro
+      - ./config/dovecot/dovecot.conf:/etc/dovecot/dovecot.conf:ro
+      - ./config/dovecot/dovecot-sql.conf.ext:/etc/dovecot/dovecot-sql.conf.ext.tmpl:ro
+    ports:
+      - "127.0.0.1:2143:2143"
+      - "127.0.0.1:2993:2993"
+    networks:
+      - mailnet
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postfix:
+    build: ./images/postfix
+    container_name: postfix
+    restart: unless-stopped
+    environment:
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - maildata:/home/mailservers
+      - certs:/certs:ro
+      - gen-config:/gen-config
+      - ./config/postfix/main.cf:/etc/postfix/main.cf:ro
+      - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
+      - ./config/postfix/pgsql:/etc/postfix/pgsql.tmpl:ro
+    ports:
+      - "127.0.0.1:2525:2525"
+      - "127.0.0.1:2465:2465"
+      - "127.0.0.1:2587:2587"
+    networks:
+      - mailnet
+    depends_on:
+      - postgres
+      - dovecot
+      - opendkim
+
+  haproxy:
+    image: haproxy:lts
+    container_name: haproxy
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_BIND_SERVICE
+    volumes:
+      - ./config/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - gen-config:/gen-config:ro
+      - certs:/certs:ro
+    depends_on:
+      - postfix
+      - dovecot
+
+  acme-web:
+    image: nginx:alpine
+    container_name: acme-web
+    restart: unless-stopped
+    volumes:
+      - ./config/nginx/acme.conf:/etc/nginx/conf.d/default.conf:ro
+      - acme-webroot:/var/www/certbot:ro
+    networks:
+      - mailnet
+
+  traefik:
+    image: traefik:v3.6
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - gen-config:/gen-config:ro
+      - certs:/certs:ro
+    networks:
+      - mailnet
+    depends_on:
+      - acme-web
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    restart: unless-stopped
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - certs:/certs
+      - acme-webroot:/var/www/certbot
+    networks:
+      - mailnet
+
+  api:
+    build:
+      context: .
+      dockerfile: images/control-plane/Dockerfile
+    container_name: api
+    restart: unless-stopped
+    command: ["uvicorn", "mailctl.api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SERVER_IP: ${SERVER_IP}
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME}
+      ACME_EMAIL: ${ACME_EMAIL}
+      ACME_SERVER: ${ACME_SERVER}
+      API_KEY: ${API_KEY}
+      ADMIN_USER: ${ADMIN_USER}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "${API_PORT}:8080"
+    volumes:
+      - gen-config:/gen-config
+      - dkim-keys:/etc/opendkim/keys
+      - certs:/certs
+      - sievedata:/var/sieve
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - mailnet
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  mailnet:
+    name: mailnet
+
+volumes:
+  pgdata:
+  maildata:
+  sievedata:
+  certs:
+  dkim-keys:
+  gen-config:
+  acme-webroot:

@@ -1,0 +1,5 @@
+hosts = postgres
+dbname = mailservers
+user = mailservers
+password = ${POSTGRES_PASSWORD}
+query = SELECT 1 FROM domains WHERE name='%s' AND active=true

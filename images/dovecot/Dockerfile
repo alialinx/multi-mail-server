@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends dovecot-core dovecot-imapd dovecot-lmtp dovecot-pgsql dovecot-sieve dovecot-managesieved gettext-base \
+    && apt-get install -y --no-install-recommends dovecot-core dovecot-imapd dovecot-lmtpd dovecot-pgsql dovecot-sieve dovecot-managesieved gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 5000 vmail \

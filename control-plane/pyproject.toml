@@ -12,6 +12,7 @@ dependencies = [
     "uvicorn>=0.29",
     "pyjwt>=2.8",
     "python-multipart>=0.0.9",
+    "dnspython>=2.4",
 ]
 
 [build-system]

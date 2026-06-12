@@ -44,6 +44,7 @@ A request is accepted if it has a valid login token **or** the correct API key.
 | GET | /domains | - | list domains |
 | POST | /domains | `{ "name": "example.com" }` | add domain, returns DNS records and cert status |
 | GET | /domains/{name}/dns | - | DNS records again |
+| GET | /domains/{name}/check | - | check deliverability: A, MX, SPF, DKIM, DMARC, PTR, blacklist |
 | POST | /domains/{name}/enable | - | enable domain |
 | POST | /domains/{name}/disable | - | disable domain |
 | DELETE | /domains/{name} | - | remove domain |
@@ -77,6 +78,18 @@ For a domain catch-all, use an address like `@example.com`. With `keep_copy: tru
 |---|---|---|
 | POST | /certs/issue/{domain} | issue certificate |
 | POST | /certs/renew | renew all certificates |
+
+## Deliverability check
+
+`GET /domains/{name}/check` looks up live DNS and tells you if the domain is set up to avoid the spam folder. Each item is `ok: true`, `ok: false`, or `ok: null` (could not check). It checks:
+
+- A record: `mail.<domain>` points to the server IP
+- MX record: the domain points to `mail.<domain>`
+- SPF, DKIM, DMARC TXT records exist and the DKIM key matches
+- PTR: the server IP has reverse DNS that forward-confirms
+- Spamhaus: the server IP is not on the zen blocklist
+
+Run this after setting DNS to find what is missing before you send real mail.
 
 ## Notes
 

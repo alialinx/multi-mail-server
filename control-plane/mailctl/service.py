@@ -2,7 +2,7 @@ import subprocess
 
 from sqlalchemy import select
 
-from . import certs, dkim, dns, reconcile, sieve, validators
+from . import certs, checks, dkim, dns, reconcile, sieve, validators
 from .db import Alias, Domain, SessionLocal, User, init_db
 from .passwords import hash_password
 
@@ -103,6 +103,16 @@ def domain_dns(name):
     finally:
         session.close()
     return dns.records(name, dkim.record_for(name))
+
+
+def check_domain(name):
+    session = SessionLocal()
+    try:
+        if not _get_domain(session, name):
+            raise ServiceError(f"domain {name} not found")
+    finally:
+        session.close()
+    return checks.run(name)
 
 
 def list_users(domain=None):

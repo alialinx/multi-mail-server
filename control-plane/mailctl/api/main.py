@@ -88,6 +88,11 @@ def domain_dns(name: str):
     return {"records": run(lambda: service.domain_dns(name))}
 
 
+@api.get("/domains/{name}/check")
+def check_domain(name: str):
+    return {"domain": name, "checks": run(lambda: service.check_domain(name))}
+
+
 @api.post("/domains/{name}/enable")
 def enable_domain(name: str):
     run(lambda: service.set_domain_active(name, True))

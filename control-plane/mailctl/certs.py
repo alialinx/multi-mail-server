@@ -19,7 +19,6 @@ def issue(domain):
         "--cert-name", f"mail.{domain}",
         *CONFIG_ARGS,
         "-d", f"mail.{domain}",
-        "-d", f"autodiscover.{domain}",
     ]
     subprocess.run(cmd, check=True)
 

@@ -4,7 +4,6 @@ from .config import SERVER_IP
 def records(domain, dkim_value):
     lines = [
         f"A      mail.{domain}                  {SERVER_IP}",
-        f"A      autodiscover.{domain}          {SERVER_IP}",
         f"MX     {domain}                       10 mail.{domain}",
         f'TXT    {domain}                       "v=spf1 mx -all"',
         f'TXT    default._domainkey.{domain}    "{dkim_value}"',

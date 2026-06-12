@@ -8,7 +8,6 @@ Example for `example.com` with server IP `203.0.113.10`:
 | Type | Name | Value |
 |---|---|---|
 | A | mail.example.com | 203.0.113.10 |
-| A | autodiscover.example.com | 203.0.113.10 |
 | MX | example.com | 10 mail.example.com |
 | TXT | example.com | `v=spf1 mx -all` |
 | TXT | default._domainkey.example.com | `v=DKIM1; k=rsa; p=...` |

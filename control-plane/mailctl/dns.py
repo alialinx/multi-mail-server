@@ -2,11 +2,10 @@ from .config import SERVER_IP
 
 
 def records(domain, dkim_value):
-    lines = [
-        f"A      mail.{domain}                  {SERVER_IP}",
-        f"MX     {domain}                       10 mail.{domain}",
-        f'TXT    {domain}                       "v=spf1 mx -all"',
-        f'TXT    default._domainkey.{domain}    "{dkim_value}"',
-        f'TXT    _dmarc.{domain}                "v=DMARC1; p=none; rua=mailto:postmaster@{domain}"',
+    return [
+        {"type": "A", "name": f"mail.{domain}", "value": SERVER_IP, "purpose": "Points your mail host to the server"},
+        {"type": "MX", "name": domain, "value": f"10 mail.{domain}", "purpose": "Where other servers deliver mail for this domain"},
+        {"type": "TXT", "name": domain, "value": "v=spf1 mx -all", "purpose": "SPF: only your server may send mail for this domain"},
+        {"type": "TXT", "name": f"default._domainkey.{domain}", "value": dkim_value, "purpose": "DKIM: public key receivers use to verify your signature"},
+        {"type": "TXT", "name": f"_dmarc.{domain}", "value": f"v=DMARC1; p=none; rua=mailto:postmaster@{domain}", "purpose": "DMARC: what receivers do if SPF or DKIM fail"},
     ]
-    return "\n".join(lines)

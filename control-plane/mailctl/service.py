@@ -29,7 +29,7 @@ def list_domains():
     session = SessionLocal()
     try:
         rows = session.query(Domain).order_by(Domain.name).all()
-        return [{"name": d.name, "active": d.active} for d in rows]
+        return [{"id": d.id, "name": d.name, "active": d.active} for d in rows]
     finally:
         session.close()
 
@@ -80,6 +80,7 @@ def remove_domain(name):
     finally:
         session.close()
     reconcile.reconcile_all()
+    return {"name": name, "removed": True}
 
 
 def set_domain_active(name, active):
@@ -93,6 +94,7 @@ def set_domain_active(name, active):
     finally:
         session.close()
     reconcile.reconcile_all()
+    return {"name": name, "active": active}
 
 
 def domain_dns(name):
@@ -127,6 +129,7 @@ def list_users(domain=None):
         rows = session.scalars(query).all()
         return [
             {
+                "id": u.id,
                 "email": u.email,
                 "active": u.active,
                 "quota_mb": u.quota // (1024 * 1024) if u.quota else 0,
@@ -152,14 +155,16 @@ def add_user(email, password, quota_mb=0):
             raise ServiceError(f"add the domain first: {domain_name}")
         if _get_user(session, email):
             raise ServiceError(f"user {email} already exists")
-        session.add(User(
+        user = User(
             domain_id=domain.id,
             email=email,
             password=hash_password(password),
             active=True,
             quota=quota_mb * 1024 * 1024,
-        ))
+        )
+        session.add(user)
         session.commit()
+        return {"id": user.id, "email": email, "active": True, "quota_mb": quota_mb}
     finally:
         session.close()
 
@@ -176,6 +181,7 @@ def set_password(email, password):
         session.commit()
     finally:
         session.close()
+    return {"email": email}
 
 
 def set_user_active(email, active):
@@ -188,6 +194,7 @@ def set_user_active(email, active):
         session.commit()
     finally:
         session.close()
+    return {"email": email, "active": active}
 
 
 def set_quota(email, quota_mb):
@@ -200,6 +207,7 @@ def set_quota(email, quota_mb):
         session.commit()
     finally:
         session.close()
+    return {"email": email, "quota_mb": quota_mb}
 
 
 def set_autoreply(email, active, subject="", text=""):
@@ -219,6 +227,7 @@ def set_autoreply(email, active, subject="", text=""):
         sieve.write_vacation(email, subject, text)
     else:
         sieve.remove(email)
+    return {"email": email, "autoreply": active}
 
 
 def remove_user(email):
@@ -232,13 +241,14 @@ def remove_user(email):
     finally:
         session.close()
     sieve.remove(email)
+    return {"email": email, "removed": True}
 
 
 def list_aliases():
     session = SessionLocal()
     try:
         rows = session.query(Alias).order_by(Alias.address).all()
-        return [{"address": a.address, "goto": a.goto_address} for a in rows]
+        return [{"id": a.id, "address": a.address, "goto": a.goto_address} for a in rows]
     finally:
         session.close()
 
@@ -261,6 +271,7 @@ def add_alias(address, goto, keep_copy=False):
         session.commit()
     finally:
         session.close()
+    return {"address": address, "goto": goto, "keep_copy": keep_copy}
 
 
 def remove_alias(address, goto=None):
@@ -275,6 +286,7 @@ def remove_alias(address, goto=None):
         session.close()
     if not deleted:
         raise ServiceError(f"alias {address} not found")
+    return {"address": address, "removed": True}
 
 
 def issue_cert(name):
@@ -282,8 +294,10 @@ def issue_cert(name):
         raise ServiceError(f"invalid domain: {name}")
     certs.issue(name)
     reconcile.reconcile_all()
+    return {"domain": name, "issued": True}
 
 
 def renew_certs():
     certs.renew()
     reconcile.reconcile_all()
+    return {"renewed": True}

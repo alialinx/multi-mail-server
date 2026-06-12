@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import auth, service
 from ..service import ServiceError
@@ -10,24 +12,36 @@ app = FastAPI(title="Mail Platform API", version="0.1.0")
 oauth2 = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
 
+def ok(data):
+    return {"ok": True, "data": data}
+
+
+@app.exception_handler(ServiceError)
+async def handle_service_error(request, exc):
+    return JSONResponse(status_code=400, content={"ok": False, "error": str(exc)})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def handle_http_error(request, exc):
+    return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": exc.detail})
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected_error(request, exc):
+    return JSONResponse(status_code=500, content={"ok": False, "error": str(exc)})
+
+
 @app.post("/token")
 def login(form: OAuth2PasswordRequestForm = Depends()):
     if not auth.check_login(form.username, form.password):
-        raise HTTPException(status_code=401, detail="invalid credentials")
+        raise StarletteHTTPException(status_code=401, detail="invalid credentials")
     return {"access_token": auth.create_token(form.username), "token_type": "bearer"}
 
 
 def authorize(token: str = Depends(oauth2)):
     if token and auth.verify_token(token):
         return
-    raise HTTPException(status_code=401, detail="not authenticated")
-
-
-def run(action):
-    try:
-        return action()
-    except ServiceError as error:
-        raise HTTPException(status_code=400, detail=str(error))
+    raise StarletteHTTPException(status_code=401, detail="not authenticated")
 
 
 class DomainIn(BaseModel):
@@ -62,7 +76,7 @@ class AliasIn(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"ok": True, "data": {"status": "ok"}}
 
 
 api = APIRouter(dependencies=[Depends(authorize)])
@@ -70,116 +84,102 @@ api = APIRouter(dependencies=[Depends(authorize)])
 
 @api.get("/domains")
 def list_domains():
-    return service.list_domains()
+    return ok(service.list_domains())
 
 
 @api.post("/domains")
 def add_domain(body: DomainIn):
-    return run(lambda: service.add_domain(body.name))
+    return ok(service.add_domain(body.name))
 
 
 @api.get("/domains/{name}/dns")
 def domain_dns(name: str):
-    return {"records": run(lambda: service.domain_dns(name))}
+    return ok(service.domain_dns(name))
 
 
 @api.get("/domains/{name}/check")
 def check_domain(name: str):
-    return {"domain": name, "checks": run(lambda: service.check_domain(name))}
+    return ok(service.check_domain(name))
 
 
 @api.post("/domains/{name}/enable")
 def enable_domain(name: str):
-    run(lambda: service.set_domain_active(name, True))
-    return {"name": name, "active": True}
+    return ok(service.set_domain_active(name, True))
 
 
 @api.post("/domains/{name}/disable")
 def disable_domain(name: str):
-    run(lambda: service.set_domain_active(name, False))
-    return {"name": name, "active": False}
+    return ok(service.set_domain_active(name, False))
 
 
 @api.delete("/domains/{name}")
 def remove_domain(name: str):
-    run(lambda: service.remove_domain(name))
-    return {"removed": name}
+    return ok(service.remove_domain(name))
 
 
 @api.get("/users")
 def list_users(domain: str = None):
-    return run(lambda: service.list_users(domain))
+    return ok(service.list_users(domain))
 
 
 @api.post("/users")
 def add_user(body: UserIn):
-    run(lambda: service.add_user(body.email, body.password, body.quota_mb))
-    return {"email": body.email}
+    return ok(service.add_user(body.email, body.password, body.quota_mb))
 
 
 @api.put("/users/{email}/password")
 def set_password(email: str, body: PasswordIn):
-    run(lambda: service.set_password(email, body.password))
-    return {"email": email}
+    return ok(service.set_password(email, body.password))
 
 
 @api.post("/users/{email}/enable")
 def enable_user(email: str):
-    run(lambda: service.set_user_active(email, True))
-    return {"email": email, "active": True}
+    return ok(service.set_user_active(email, True))
 
 
 @api.post("/users/{email}/disable")
 def disable_user(email: str):
-    run(lambda: service.set_user_active(email, False))
-    return {"email": email, "active": False}
+    return ok(service.set_user_active(email, False))
 
 
 @api.put("/users/{email}/quota")
 def set_quota(email: str, body: QuotaIn):
-    run(lambda: service.set_quota(email, body.quota_mb))
-    return {"email": email, "quota_mb": body.quota_mb}
+    return ok(service.set_quota(email, body.quota_mb))
 
 
 @api.put("/users/{email}/autoreply")
 def set_autoreply(email: str, body: AutoreplyIn):
-    run(lambda: service.set_autoreply(email, body.active, body.subject, body.text))
-    return {"email": email, "autoreply": body.active}
+    return ok(service.set_autoreply(email, body.active, body.subject, body.text))
 
 
 @api.delete("/users/{email}")
 def remove_user(email: str):
-    run(lambda: service.remove_user(email))
-    return {"removed": email}
+    return ok(service.remove_user(email))
 
 
 @api.get("/aliases")
 def list_aliases():
-    return service.list_aliases()
+    return ok(service.list_aliases())
 
 
 @api.post("/aliases")
 def add_alias(body: AliasIn):
-    run(lambda: service.add_alias(body.address, body.goto, body.keep_copy))
-    return {"address": body.address, "goto": body.goto}
+    return ok(service.add_alias(body.address, body.goto, body.keep_copy))
 
 
 @api.delete("/aliases")
 def remove_alias(address: str, goto: str = None):
-    run(lambda: service.remove_alias(address, goto))
-    return {"removed": address}
+    return ok(service.remove_alias(address, goto))
 
 
 @api.post("/certs/issue/{domain}")
 def issue_cert(domain: str):
-    run(lambda: service.issue_cert(domain))
-    return {"domain": domain}
+    return ok(service.issue_cert(domain))
 
 
 @api.post("/certs/renew")
 def renew_certs():
-    service.renew_certs()
-    return {"status": "renewed"}
+    return ok(service.renew_certs())
 
 
 app.include_router(api)

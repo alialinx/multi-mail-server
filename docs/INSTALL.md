@@ -18,20 +18,24 @@ cd mail-platform
 ./install.sh
 ```
 
-`install.sh` asks for:
+`install.sh` asks you a few things and saves them to `.env`. You press Enter after each answer.
 
-- Server public IP (it tries to detect it)
-- Mail hostname, for example `mx.example.com`
-- ACME email for Let's Encrypt
-- API port (any port except 8000)
+| Question | What it is | Why it is needed |
+|---|---|---|
+| Server public IP | Your server's public IP. It is auto-detected, press Enter to accept. | It goes into the A and MX DNS records for your domains. |
+| Mail hostname | One name for the server itself, like `mx.example.com`. Not one per domain. | The server announces this name when it sends mail (HELO) and your PTR points to it. See [DNS.md](DNS.md). |
+| ACME email | Your email address. | Let's Encrypt uses it for certificate expiry notices. |
+| API port | Port for the admin API, default 8080. Any port except 8000. | This is where you open the Swagger UI. |
+| Admin username | Login name for the API, default `admin`. | Used to log in to Swagger. |
+| Admin password | Login password. It is typed hidden, so nothing shows on screen. That is normal. | Used to log in to Swagger. Save it somewhere. |
 
-It writes these to `.env`, builds the images, starts the database and API, creates the database tables and base config, then starts the rest of the stack.
+The installer also generates random secrets (database password, API key, JWT secret) and writes them to `.env`. You do not type these.
 
-When it finishes it prints the Swagger UI address and reminds you the API key is in `.env`.
+Then it builds the images, starts the database and API, creates the database tables and base config, and starts the rest of the stack. When it finishes it prints the Swagger UI address.
 
 ## Manage everything from Swagger
 
-Open `http://<server>:<API_PORT>/docs`. Every request needs the `X-API-Key` header with the key from `.env`.
+Open `http://<server>:<API_PORT>/docs`. Click **Authorize** and log in with your admin username and password.
 
 Full endpoint list is in [API.md](API.md). The common flow:
 

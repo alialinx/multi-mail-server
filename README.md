@@ -13,6 +13,25 @@ Built on Postfix, Dovecot, PostgreSQL, OpenDKIM, HAProxy, Traefik and Let's Encr
 - One PostgreSQL database as the single source of truth
 - A REST API with a Swagger UI for all administration
 
+## Requirements
+
+- A Linux server (a real VPS or bare metal, not Docker Desktop) with a public IP
+- A domain you control
+- Outbound port 25 not blocked by your provider
+
+Docker is installed automatically by `install.sh` if it is missing. You do not need to install it first.
+
+### Open these ports in your firewall
+
+The installer does not change your firewall. Open these yourself:
+
+| Port | For |
+|---|---|
+| 25, 465, 587 | SMTP (receive and send) |
+| 143, 993 | IMAP |
+| 80, 443 | HTTP and HTTPS (certificates, web) |
+| API port (default 8080) | admin API, open only to your own IP |
+
 ## Quick start
 
 ```

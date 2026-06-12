@@ -4,12 +4,12 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 if ! command -v docker >/dev/null 2>&1; then
-    echo "docker is not installed"
-    exit 1
+    echo "Docker not found. Installing..."
+    curl -fsSL https://get.docker.com | sh
 fi
 
 if ! docker compose version >/dev/null 2>&1; then
-    echo "docker compose plugin is not installed"
+    echo "docker compose plugin is missing. Install it and run again."
     exit 1
 fi
 

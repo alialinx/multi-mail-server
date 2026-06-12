@@ -2,11 +2,13 @@
 
 ## Requirements
 
-- A server with a public IP
-- Docker and the Docker Compose plugin
-- Ports open to the internet: 25, 80, 143, 443, 465, 587, 993
-- The API port you choose (default 8080) open only to you, not the whole internet
+- A Linux server with a public IP (a real VPS or bare metal, not Docker Desktop)
 - A reverse DNS (PTR) record for your server IP, set at your hosting provider
+- Outbound port 25 not blocked by your provider
+
+Docker is installed automatically by `install.sh` if it is missing.
+
+You open the firewall yourself; the installer does not touch it. Open: 25, 80, 143, 443, 465, 587, 993 to the internet, and the API port (default 8080) only to your own IP.
 
 ## Steps
 

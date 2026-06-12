@@ -28,6 +28,13 @@ services:
     networks:
       - mailnet
 
+  spamassassin:
+    build: ./images/spamassassin
+    container_name: spamassassin
+    restart: unless-stopped
+    networks:
+      - mailnet
+
   dovecot:
     build: ./images/dovecot
     container_name: dovecot
@@ -37,6 +44,7 @@ services:
     volumes:
       - maildata:/home/mailservers
       - sievedata:/var/sieve
+      - maillog:/var/log/mail
       - certs:/certs:ro
       - gen-config:/gen-config:ro
       - ./config/dovecot/dovecot.conf:/etc/dovecot/dovecot.conf:ro
@@ -59,6 +67,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - maildata:/home/mailservers
+      - maillog:/var/log/mail
       - certs:/certs:ro
       - gen-config:/gen-config
       - ./config/postfix/main.cf:/etc/postfix/main.cf:ro
@@ -74,6 +83,7 @@ services:
       - postgres
       - dovecot
       - opendkim
+      - spamassassin
 
   haproxy:
     image: haproxy:lts
@@ -127,6 +137,21 @@ services:
     networks:
       - mailnet
 
+  fail2ban:
+    build: ./images/fail2ban
+    container_name: fail2ban
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - maillog:/var/log/mail:ro
+      - ./config/fail2ban/jail.local:/etc/fail2ban/jail.local:ro
+    depends_on:
+      - postfix
+      - dovecot
+
   api:
     build:
       context: .
@@ -166,6 +191,7 @@ volumes:
   pgdata:
   maildata:
   sievedata:
+  maillog:
   certs:
   dkim-keys:
   gen-config:

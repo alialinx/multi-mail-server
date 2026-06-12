@@ -8,6 +8,8 @@ done
 
 postconf -e "myhostname=${MAIL_HOSTNAME}"
 
+mkdir -p /var/log/mail
+
 mkdir -p /gen-config/postfix
 touch /gen-config/postfix/sni
 postmap -F hash:/gen-config/postfix/sni

@@ -7,6 +7,8 @@ RUN apt-get update \
 RUN groupadd -g 5000 vmail \
     && useradd -g vmail -u 5000 -d /home/mailservers -s /usr/sbin/nologin vmail
 
+COPY spam.sieve /etc/dovecot/sieve/spam.sieve
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

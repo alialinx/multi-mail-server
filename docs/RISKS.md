@@ -76,7 +76,16 @@ Self-hosted mail can land in spam until the IP has a good reputation, a correct 
 Many providers block outbound port 25, which stops sending.
 - Status: **accepted**. Ask your provider to open it.
 
+### Fail2ban needs host firewall access
+Fail2ban runs on the host network with `NET_ADMIN` and `NET_RAW` so it can add firewall rules. This is a privileged container that changes the host firewall.
+- Status: **accepted**. It only bans on the public mail ports, which all arrive through HAProxy on the host. It does not cover the web or API ports. On some hosts its rules can interact with Docker's own iptables rules, so verify bans work after install.
+
+### Spam filtering is basic
+SpamAssassin runs with default rules. There is no Bayes training, no rule auto-update schedule, and no per-user threshold.
+- Status: **accepted**.
+- Planned: scheduled `sa-update`, Bayes learning from the Junk folder.
+
 ## Not in Phase 1
 
-Monitoring, alerting, mail queue management, log rotation, and fail2ban are not included yet.
+Monitoring, alerting, mail queue management, and log rotation are not included yet.
 - Status: **planned**.

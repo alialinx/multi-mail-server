@@ -49,10 +49,12 @@ smtpd_tls_received_header = yes
 smtpd_tls_chain_files = /certs/default/privkey.pem, /certs/default/fullchain.pem
 tls_server_sni_maps = hash:/gen-config/postfix/sni
 
-smtpd_milters = inet:opendkim:8891
+smtpd_milters = inet:opendkim:8891, inet:spamassassin:8892
 non_smtpd_milters = inet:opendkim:8891
 milter_default_action = accept
 milter_protocol = 6
+
+maillog_file = /var/log/mail/postfix.log
 
 smtpd_helo_required = yes
 smtpd_helo_restrictions =

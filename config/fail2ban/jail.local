@@ -1,0 +1,15 @@
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+backend = polling
+banaction = iptables-allports
+
+[postfix]
+enabled = true
+mode = aggressive
+logpath = /var/log/mail/postfix.log
+
+[dovecot]
+enabled = true
+logpath = /var/log/mail/dovecot.log

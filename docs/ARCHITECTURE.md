@@ -21,10 +21,12 @@ Each part runs in its own container. They are wired with one Docker network call
 | postfix | SMTP. Receives mail on 25, sends mail, submission on 465 and 587 |
 | dovecot | IMAP on 143 and 993, and LMTP for local delivery |
 | opendkim | Signs outgoing mail with DKIM |
+| spamassassin | Scans incoming mail and marks spam |
 | haproxy | The edge for mail ports. Terminates TLS for 465 and 993 |
 | traefik | The edge for web ports 80 and 443 |
 | acme-web | A tiny nginx that serves Let's Encrypt HTTP challenges |
 | certbot | Gets and renews all certificates |
+| fail2ban | Bans IPs that brute-force SMTP or IMAP login |
 | api | The REST API, the reconcile logic, and the bootstrap step. This is the control plane |
 
 ## Ports and client IP
@@ -63,6 +65,12 @@ After writing, it reloads opendkim, postfix, dovecot, and haproxy. Traefik picks
 One certbot container gets all certificates with the HTTP-01 challenge. Traefik routes the challenge path to the `acme-web` nginx, which serves the challenge files. Certbot writes certificates to the shared `certs` volume under `/certs/live/mail.<domain>/`. HAProxy, Dovecot, Postfix, and Traefik all read from there.
 
 There is one self-signed default certificate at `/certs/default`. It is the fallback when a connection does not match any domain.
+
+## Spam filtering and bans
+
+Incoming mail goes through SpamAssassin as a Postfix milter. It adds an `X-Spam-Flag` header. A global Sieve rule (`spam.sieve`) moves flagged mail into the Junk folder. Submission ports (465, 587) skip SpamAssassin so your own users' outgoing mail is not scanned.
+
+Fail2ban reads the Postfix and Dovecot log files from the shared `maillog` volume and bans IPs that fail login too many times. It runs on the host network with `NET_ADMIN` so it can add firewall rules for the public mail ports. Because HAProxy forwards the real client IP with the PROXY protocol, the logs show the real IP and the bans are correct.
 
 ## Reloads and the Docker socket
 

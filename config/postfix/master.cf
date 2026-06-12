@@ -39,6 +39,7 @@ postlog   unix-dgram n  -       n       -       1       postlogd
   -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
   -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
   -o smtpd_sender_restrictions=
+  -o smtpd_milters=inet:opendkim:8891
   -o milter_macro_daemon_name=ORIGINATING
 
 2465      inet  n       -       n       -       -       smtpd
@@ -52,4 +53,5 @@ postlog   unix-dgram n  -       n       -       1       postlogd
   -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
   -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
   -o smtpd_sender_restrictions=
+  -o smtpd_milters=inet:opendkim:8891
   -o milter_macro_daemon_name=ORIGINATING

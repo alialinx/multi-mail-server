@@ -47,10 +47,10 @@ Full endpoint list is in [API.md](API.md). The common flow:
 
 ## Certificate renewal
 
-Certificates do not renew on their own. Add a daily cron job on the host that calls the renew endpoint:
+Certificates do not renew on their own. Add a daily cron job on the host:
 
 ```
-0 3 * * * curl -s -X POST -H "X-API-Key: YOUR_KEY" http://127.0.0.1:8080/certs/renew
+0 3 * * * cd /path/to/mail-platform && docker compose exec -T api python -m mailctl.renew
 ```
 
 ## Notes

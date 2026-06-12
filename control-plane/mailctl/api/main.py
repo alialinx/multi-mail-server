@@ -1,11 +1,8 @@
-import hmac
-
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
 from .. import auth, service
-from ..config import API_KEY
 from ..service import ServiceError
 
 app = FastAPI(title="Mail Platform API", version="0.1.0")
@@ -20,9 +17,7 @@ def login(form: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": auth.create_token(form.username), "token_type": "bearer"}
 
 
-def authorize(token: str = Depends(oauth2), x_api_key: str = Header(None)):
-    if API_KEY and x_api_key and hmac.compare_digest(x_api_key, API_KEY):
-        return
+def authorize(token: str = Depends(oauth2)):
     if token and auth.verify_token(token):
         return
     raise HTTPException(status_code=401, detail="not authenticated")

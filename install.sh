@@ -49,7 +49,6 @@ if [ ! -f .env ]; then
     echo
 
     db_password="$(openssl rand -hex 24)"
-    api_key="$(openssl rand -hex 32)"
     jwt_secret="$(openssl rand -hex 32)"
 
     cat > .env <<EOF
@@ -59,7 +58,6 @@ ACME_EMAIL=${acme_email}
 ACME_SERVER=https://acme-v02.api.letsencrypt.org/directory
 
 API_PORT=${api_port}
-API_KEY=${api_key}
 
 ADMIN_USER=${admin_user}
 ADMIN_PASSWORD=${admin_password}

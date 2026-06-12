@@ -28,7 +28,7 @@ DKIM private keys are written with mode 0644 inside the keys volume.
 
 ### API exposes control over a network port
 The REST API can do everything, including operations that use the Docker socket. It is reachable on `API_PORT`.
-- Status: **mitigated**. Endpoints need auth: an admin login (username and password, returns a bearer token that lasts 8 hours) or a static `X-API-Key` for automation. Only `/health`, `/docs`, and `/token` are open. Credentials and the JWT secret are in `.env`.
+- Status: **mitigated**. Endpoints need an admin login (username and password, returns a bearer token that lasts 8 hours). Only `/health`, `/docs`, and `/token` are open. Credentials and the JWT secret are in `.env`. Certificate renewal runs inside the container (`python -m mailctl.renew`), so automation does not need an API key.
 - Also do: put the API port behind a firewall, and put it behind HTTPS in production so the login and tokens are not sent in clear text.
 
 ### Passwords in API requests

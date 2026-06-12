@@ -2,7 +2,7 @@ import dns.resolver
 import dns.reversename
 
 from . import dkim
-from .config import SERVER_IP
+from .config import MAIL_HOSTNAME, SERVER_IP
 
 
 def _txt(name):
@@ -82,6 +82,8 @@ def run(domain):
     detail = f"{SERVER_IP} PTR -> {ptr or 'none'}"
     if ptr and not confirms:
         detail += " (does not forward-confirm)"
+    if ptr and MAIL_HOSTNAME not in ptr:
+        detail += f" (does not match mail hostname {MAIL_HOSTNAME})"
     results.append(result("PTR reverse DNS", bool(ptr) and confirms, detail))
 
     listed = _blacklisted(SERVER_IP)

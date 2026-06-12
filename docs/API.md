@@ -53,7 +53,7 @@ A request is accepted if it has a valid login token **or** the correct API key.
 | Method | Path | Body | Action |
 |---|---|---|---|
 | GET | /users?domain=example.com | - | list users |
-| POST | /users | `{ "email": "a@x.com", "password": "...", "quota_mb": 0 }` | add user |
+| POST | /users | `{ "email": "info@example.com", "password": "...", "quota_mb": 0 }` | add user |
 | PUT | /users/{email}/password | `{ "password": "..." }` | change password |
 | POST | /users/{email}/enable | - | enable user |
 | POST | /users/{email}/disable | - | disable user |
@@ -66,8 +66,8 @@ A request is accepted if it has a valid login token **or** the correct API key.
 | Method | Path | Body | Action |
 |---|---|---|---|
 | GET | /aliases | - | list aliases |
-| POST | /aliases | `{ "address": "info@x.com", "goto": "a@gmail.com", "keep_copy": false }` | add forwarding |
-| DELETE | /aliases?address=info@x.com&goto=a@gmail.com | - | remove (goto is optional) |
+| POST | /aliases | `{ "address": "info@example.com", "goto": "user@example.org", "keep_copy": false }` | add forwarding |
+| DELETE | /aliases?address=info@example.com&goto=user@example.org | - | remove (goto is optional) |
 
 For a domain catch-all, use an address like `@example.com`. With `keep_copy: true` and a real mailbox address, a copy stays in the mailbox and the mail is also forwarded.
 

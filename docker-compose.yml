@@ -70,7 +70,7 @@ services:
       - maillog:/var/log/mail
       - certs:/certs:ro
       - gen-config:/gen-config
-      - ./config/postfix/main.cf:/etc/postfix/main.cf:ro
+      - ./config/postfix/main.cf:/etc/postfix/main.cf.tmpl:ro
       - ./config/postfix/master.cf:/etc/postfix/master.cf:ro
       - ./config/postfix/pgsql:/etc/postfix/pgsql.tmpl:ro
     ports:
@@ -90,6 +90,7 @@ services:
     container_name: haproxy
     restart: unless-stopped
     network_mode: host
+    user: root
     cap_add:
       - NET_BIND_SERVICE
     volumes:

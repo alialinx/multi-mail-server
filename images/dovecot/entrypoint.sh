@@ -11,5 +11,6 @@ mkdir -p /var/sieve
 chown -R vmail:vmail /var/sieve
 
 mkdir -p /var/log/mail
+touch /var/log/mail/dovecot.log
 
 exec dovecot -F

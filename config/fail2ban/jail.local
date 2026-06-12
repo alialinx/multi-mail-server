@@ -5,6 +5,9 @@ maxretry = 5
 backend = polling
 banaction = iptables-allports
 
+[sshd]
+enabled = false
+
 [postfix]
 enabled = true
 mode = aggressive

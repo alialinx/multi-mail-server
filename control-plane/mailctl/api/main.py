@@ -144,6 +144,11 @@ def list_users(domain: str = None):
     return ok(service.list_users(domain))
 
 
+@api.get("/users/usage")
+def users_usage():
+    return ok(service.users_usage())
+
+
 @api.post("/users")
 def add_user(body: UserIn):
     return ok(service.add_user(body.email, body.password, body.quota_mb))
@@ -212,6 +217,21 @@ def status():
 @api.get("/stats")
 def stats():
     return ok(service.get_stats())
+
+
+@api.get("/logs")
+def logs(source: str = "postfix", q: str = "", limit: int = 200):
+    return ok(service.get_logs(source, q, limit))
+
+
+@api.get("/fail2ban")
+def fail2ban_status():
+    return ok(service.fail2ban_status())
+
+
+@api.delete("/fail2ban/banned/{ip}")
+def fail2ban_unban(ip: str):
+    return ok(service.fail2ban_unban(ip))
 
 
 @api.get("/queue")

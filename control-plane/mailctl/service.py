@@ -2,7 +2,10 @@ import subprocess
 
 from sqlalchemy import select
 
-from . import certs, checks, dkim, dns, mailqueue, reconcile, sieve, stats, status, validators
+from . import (
+    bans, certs, checks, dkim, dns, logs, mailqueue,
+    reconcile, sieve, stats, status, usage, validators,
+)
 from .db import Alias, Domain, SessionLocal, User, init_db
 from .passwords import hash_password
 
@@ -309,6 +312,26 @@ def get_status():
 
 def get_stats():
     return stats.get_stats()
+
+
+def users_usage():
+    return usage.usage()
+
+
+def get_logs(source="postfix", q="", limit=200):
+    if q and len(q) > 200:
+        raise ServiceError("search query too long")
+    return logs.tail(source, q, limit)
+
+
+def fail2ban_status():
+    return bans.status()
+
+
+def fail2ban_unban(ip):
+    if not bans.IP_RE.match(ip):
+        raise ServiceError(f"invalid ip: {ip}")
+    return bans.unban(ip)
 
 
 def list_queue():

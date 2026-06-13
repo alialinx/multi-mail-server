@@ -6,3 +6,5 @@ default_pass_scheme = SHA512-CRYPT
 password_query = SELECT email AS user, password FROM users WHERE email='%u' AND active=true
 
 user_query = SELECT '/home/mailservers/%d/%n' AS home, 5000 AS uid, 5000 AS gid, CASE WHEN quota > 0 THEN '*:bytes=' || quota ELSE NULL END AS quota_rule FROM users WHERE email='%u' AND active=true
+
+iterate_query = SELECT email AS user FROM users WHERE active=true

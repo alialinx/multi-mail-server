@@ -214,6 +214,8 @@ const NAV = [
     { key: "aliases", label: "Aliases", ico: "↪" },
     { key: "queue", label: "Mail queue", ico: "📬" },
     { key: "certs", label: "Certificates", ico: "🔒" },
+    { key: "logs", label: "Logs", ico: "📜" },
+    { key: "security", label: "Security", ico: "🛡️" },
 ];
 
 function renderShell() {
@@ -253,7 +255,7 @@ function go(view) {
     document.querySelectorAll(".nav a[data-view]").forEach((a) => a.classList.toggle("active", a.dataset.view === view));
     $("#page-title").textContent = NAV.find((n) => n.key === view).label;
     $("#topbar-actions").innerHTML = "";
-    const views = { dashboard: viewDashboard, domains: viewDomains, users: viewUsers, aliases: viewAliases, queue: viewQueue, certs: viewCerts };
+    const views = { dashboard: viewDashboard, domains: viewDomains, users: viewUsers, aliases: viewAliases, queue: viewQueue, certs: viewCerts, logs: viewLogs, security: viewSecurity };
     views[view]();
 }
 
@@ -274,13 +276,14 @@ async function viewDomains() {
         <tr>
             <td><strong>${esc(d.name)}</strong></td>
             <td>${statusBadge(d.active)}</td>
+            <td class="dcheck" data-domain="${esc(d.name)}"><span class="muted">…</span></td>
             <td class="actions">
                 <button class="ghost sm" data-act="dns" data-name="${esc(d.name)}">DNS</button>
                 <button class="ghost sm" data-act="check" data-name="${esc(d.name)}">Check</button>
                 <button class="ghost sm" data-act="toggle" data-name="${esc(d.name)}" data-active="${d.active}">${d.active ? "Disable" : "Enable"}</button>
                 <button class="danger sm" data-act="delete" data-name="${esc(d.name)}">Delete</button>
             </td>
-        </tr>`).join("") : `<tr><td colspan="3" class="empty">No domains yet. Add one above.</td></tr>`;
+        </tr>`).join("") : `<tr><td colspan="4" class="empty">No domains yet. Add one above.</td></tr>`;
 
     $("#content").innerHTML = `
         <div class="card">
@@ -295,7 +298,7 @@ async function viewDomains() {
         </div>
         <div class="card">
             <div class="card-head"><h3>Domains</h3><span class="muted">${domains.length} total</span></div>
-            <table><thead><tr><th>Name</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+            <table><thead><tr><th>Name</th><th>Active</th><th>Deliverability</th><th></th></tr></thead><tbody>${rows}</tbody></table>
         </div>`;
 
     $("#add-domain").addEventListener("submit", async (e) => {
@@ -315,6 +318,7 @@ async function viewDomains() {
     });
 
     $("#content").addEventListener("click", onDomainAction);
+    loadDomainBadges();
 }
 
 async function onDomainAction(e) {
@@ -390,18 +394,33 @@ async function viewUsers() {
         try { state.domains = await api("GET", "/domains"); } catch (e) { return errorState(e); }
     }
     const filter = state._userFilter || "";
-    let users;
-    try { users = await api("GET", `/users${filter ? `?domain=${encodeURIComponent(filter)}` : ""}`); }
-    catch (e) { return errorState(e); }
+    let users, usage = {};
+    try {
+        [users, usage] = await Promise.all([
+            api("GET", `/users${filter ? `?domain=${encodeURIComponent(filter)}` : ""}`),
+            api("GET", "/users/usage").catch(() => ({})),
+        ]);
+    } catch (e) { return errorState(e); }
 
     const domainOpts = `<option value="">All domains</option>` +
         state.domains.map((d) => `<option value="${esc(d.name)}" ${d.name === filter ? "selected" : ""}>${esc(d.name)}</option>`).join("");
+
+    const usageCell = (u) => {
+        const used = usage[u.email] ? usage[u.email].used_mb : null;
+        if (!u.quota_mb) {
+            return used != null ? `${used} MB <span class="muted">/ ∞</span>` : '<span class="muted">unlimited</span>';
+        }
+        const pct = used != null ? Math.min(Math.round(used / u.quota_mb * 100), 100) : 0;
+        const kind = pct >= 90 ? "bad" : pct >= 75 ? "warn" : "";
+        return `<div class="bar mini" style="margin-bottom:3px"><div class="bar-fill ${kind}" style="width:${pct}%"></div></div>
+            <span class="muted" style="font-size:12px">${used != null ? used : "?"} / ${u.quota_mb} MB</span>`;
+    };
 
     const rows = users.length ? users.map((u) => `
         <tr>
             <td><strong>${esc(u.email)}</strong></td>
             <td>${statusBadge(u.active)}</td>
-            <td>${u.quota_mb ? `${u.quota_mb} MB` : '<span class="muted">unlimited</span>'}</td>
+            <td style="min-width:140px">${usageCell(u)}</td>
             <td>${u.autoreply ? '<span class="badge ok">on</span>' : '<span class="badge neutral">off</span>'}</td>
             <td class="actions">
                 <button class="ghost sm" data-act="password" data-email="${esc(u.email)}">Password</button>
@@ -430,7 +449,7 @@ async function viewUsers() {
                 <h3>Users</h3>
                 <div style="width:220px"><select id="u-filter">${domainOpts}</select></div>
             </div>
-            <table><thead><tr><th>Email</th><th>Status</th><th>Quota</th><th>Auto-reply</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+            <table><thead><tr><th>Email</th><th>Status</th><th>Usage</th><th>Auto-reply</th><th></th></tr></thead><tbody>${rows}</tbody></table>
         </div>`;
 
     $("#u-filter").addEventListener("change", (e) => { state._userFilter = e.target.value; viewUsers(); });
@@ -787,6 +806,95 @@ async function viewQueue() {
         confirmAction(`Delete message ${btn.dataset.id}?`, async () => {
             await api("DELETE", `/queue/${encodeURIComponent(btn.dataset.id)}`); toast("Message deleted"); viewQueue();
         }, { confirmLabel: "Delete", danger: true });
+    });
+}
+
+/* ============================================================
+   Logs
+   ============================================================ */
+async function viewLogs() {
+    const src = state._logSource || "postfix";
+    const q = state._logQuery || "";
+    $("#content").innerHTML = `
+        <div class="card">
+            <div class="card-head">
+                <h3>Logs</h3>
+                <div class="row-gap">
+                    <select id="l-source" style="width:auto">
+                        <option value="postfix" ${src === "postfix" ? "selected" : ""}>Postfix (SMTP)</option>
+                        <option value="dovecot" ${src === "dovecot" ? "selected" : ""}>Dovecot (IMAP)</option>
+                    </select>
+                    <input id="l-q" placeholder="search: email, message-id…" value="${esc(q)}" style="width:240px">
+                    <button class="ghost sm" id="l-go">Search</button>
+                    <button class="ghost sm" id="l-refresh">Refresh</button>
+                </div>
+            </div>
+            <div class="card-body"><pre class="logbox" id="l-out"><span class="muted">Loading…</span></pre></div>
+        </div>
+        <p class="hint">Shows the last 300 lines, or matching lines when you search. Tip: paste a recipient address or message-id to trace a single mail.</p>`;
+
+    const load = async () => {
+        const out = $("#l-out");
+        out.innerHTML = '<span class="muted">Loading…</span>';
+        try {
+            const r = await api("GET", `/logs?source=${encodeURIComponent($("#l-source").value)}&q=${encodeURIComponent($("#l-q").value.trim())}&limit=300`);
+            out.textContent = r.lines.length ? r.lines.join("\n") : "No matching log lines.";
+            out.scrollTop = out.scrollHeight;
+        } catch (e) { out.textContent = e.message; }
+    };
+    $("#l-source").addEventListener("change", () => { state._logSource = $("#l-source").value; load(); });
+    $("#l-go").addEventListener("click", () => { state._logQuery = $("#l-q").value.trim(); load(); });
+    $("#l-refresh").addEventListener("click", load);
+    $("#l-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { state._logQuery = $("#l-q").value.trim(); load(); } });
+    load();
+}
+
+/* ============================================================
+   Security (fail2ban)
+   ============================================================ */
+async function viewSecurity() {
+    loading();
+    let jails;
+    try { jails = await api("GET", "/fail2ban"); }
+    catch (e) { return errorState(e); }
+
+    const cards = jails.length ? jails.map((j) => `
+        <div class="card">
+            <div class="card-head"><h3>${esc(j.jail)}</h3><span class="muted">${j.count} banned</span></div>
+            <div class="card-body">
+                ${j.banned.length
+                    ? `<div class="chips">${j.banned.map((ip) => `<span class="chip">${esc(ip)}<button class="chip-x" data-ip="${esc(ip)}" title="unban">&times;</button></span>`).join("")}</div>`
+                    : '<p class="muted" style="margin:0">No banned IPs.</p>'}
+            </div>
+        </div>`).join("") : '<div class="card"><div class="card-body"><p class="muted" style="margin:0">No active jails.</p></div></div>';
+
+    $("#content").innerHTML = `${cards}<p class="hint">fail2ban bans IPs that fail SMTP or IMAP login too many times. Click × to unban an address.</p>`;
+
+    $("#content").querySelectorAll(".chip-x").forEach((b) => b.addEventListener("click", () => {
+        const ip = b.dataset.ip;
+        confirmAction(`Unban ${ip}?`, async () => {
+            await api("DELETE", `/fail2ban/banned/${encodeURIComponent(ip)}`);
+            toast(`Unbanned ${ip}`); viewSecurity();
+        }, { confirmLabel: "Unban" });
+    }));
+}
+
+/* ---------- domain deliverability badges (lazy) ---------- */
+function loadDomainBadges() {
+    document.querySelectorAll(".dcheck").forEach(async (cell) => {
+        const name = cell.dataset.domain;
+        cell.innerHTML = '<span class="spinner" style="border-color:#ddd;border-top-color:var(--accent);width:12px;height:12px"></span>';
+        try {
+            const items = await api("GET", `/domains/${encodeURIComponent(name)}/check`);
+            const checkable = items.filter((i) => i.ok !== null);
+            const total = checkable.length;
+            const okCount = checkable.filter((i) => i.ok === true).length;
+            const cls = okCount === total && total > 0 ? "ok" : okCount >= total - 1 ? "warn-b" : "off";
+            const tip = items.map((i) => `${i.check}: ${i.ok === true ? "ok" : i.ok === false ? "fail" : "?"}`).join(" · ");
+            cell.innerHTML = `<span class="badge ${cls}" title="${esc(tip)}">${okCount}/${total} ✓</span>`;
+        } catch {
+            cell.innerHTML = '<span class="muted">—</span>';
+        }
     });
 }
 

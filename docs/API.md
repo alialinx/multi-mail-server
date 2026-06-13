@@ -42,6 +42,7 @@ The response has `access_token`. Send it on later requests as `Authorization: Be
 | Method | Path | Body | Action |
 |---|---|---|---|
 | GET | /users?domain=example.com | - | list users |
+| GET | /users/usage | - | map of email to mailbox storage used (MB) and percent of quota |
 | POST | /users | `{ "email": "info@example.com", "password": "...", "quota_mb": 0 }` | add user |
 | PUT | /users/{email}/password | `{ "password": "..." }` | change password |
 | POST | /users/{email}/enable | - | enable user |
@@ -78,6 +79,14 @@ Renewal also runs automatically in the background twice a day, so you rarely nee
 | GET | /queue | list queued messages (id, sender, recipients, queue, delay reason) |
 | POST | /queue/flush | retry delivery of the whole queue now |
 | DELETE | /queue/{id} | delete one message; use `ALL` to delete the whole queue |
+
+### Logs and security
+
+| Method | Path | Action |
+|---|---|---|
+| GET | /logs?source=postfix&q=&limit=200 | recent log lines from `postfix` or `dovecot`; `q` filters (grep), trace a mail by recipient or message-id |
+| GET | /fail2ban | jails and their currently banned IPs |
+| DELETE | /fail2ban/banned/{ip} | unban an IP |
 
 ## Deliverability check
 

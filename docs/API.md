@@ -65,7 +65,18 @@ For a domain catch-all, use an address like `@example.com`. With `keep_copy: tru
 | Method | Path | Action |
 |---|---|---|
 | POST | /certs/issue/{domain} | issue certificate |
-| POST | /certs/renew | renew all certificates |
+| POST | /certs/renew | renew all certificates now |
+
+Renewal also runs automatically in the background twice a day, so you rarely need `POST /certs/renew`.
+
+### Status and mail queue
+
+| Method | Path | Action |
+|---|---|---|
+| GET | /status | dashboard data: domain/user/alias counts, service health, disk usage, mail queue size, per-domain certificate expiry |
+| GET | /queue | list queued messages (id, sender, recipients, queue, delay reason) |
+| POST | /queue/flush | retry delivery of the whole queue now |
+| DELETE | /queue/{id} | delete one message; use `ALL` to delete the whole queue |
 
 ## Deliverability check
 

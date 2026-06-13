@@ -1,3 +1,6 @@
+import threading
+import time
+
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -8,6 +11,25 @@ from .. import auth, service
 from ..service import ServiceError
 
 app = FastAPI(title="Mail Platform API", version="0.1.0")
+
+RENEW_INTERVAL_SECONDS = 12 * 3600
+
+
+def _renew_loop():
+    # certbot only renews certs that are close to expiry, so running this twice
+    # a day is safe and removes the need for a manual cron job on the host.
+    time.sleep(600)
+    while True:
+        try:
+            service.renew_certs()
+        except Exception:
+            pass
+        time.sleep(RENEW_INTERVAL_SECONDS)
+
+
+@app.on_event("startup")
+def start_cert_renewal():
+    threading.Thread(target=_renew_loop, daemon=True).start()
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
@@ -180,6 +202,26 @@ def issue_cert(domain: str):
 @api.post("/certs/renew")
 def renew_certs():
     return ok(service.renew_certs())
+
+
+@api.get("/status")
+def status():
+    return ok(service.get_status())
+
+
+@api.get("/queue")
+def list_queue():
+    return ok(service.list_queue())
+
+
+@api.post("/queue/flush")
+def flush_queue():
+    return ok(service.flush_queue())
+
+
+@api.delete("/queue/{queue_id}")
+def delete_queue(queue_id: str):
+    return ok(service.delete_queue(queue_id))
 
 
 app.include_router(api)

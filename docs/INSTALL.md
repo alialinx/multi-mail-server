@@ -50,10 +50,14 @@ The common flow:
 
 ## Certificate renewal
 
-Certificates do not renew on their own. Add a daily cron job on the host:
+Renewal is automatic. The API container runs a background task that renews
+due certificates twice a day, so you do not need a cron job. You can see each
+domain's expiry on the Dashboard, or force a renewal now with `POST /certs/renew`.
+
+If you prefer to run it from the host instead, the command still works:
 
 ```
-0 3 * * * cd /path/to/mail-platform && docker compose exec -T api python -m mailctl.renew
+docker compose exec -T api python -m mailctl.renew
 ```
 
 ## Notes

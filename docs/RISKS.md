@@ -92,5 +92,7 @@ The Debian package used did not ship a standalone `spamd` binary, so SpamAssassi
 
 ## Not in Phase 1
 
-Monitoring, alerting, mail queue management, and log rotation are not included yet.
-- Status: **planned**.
+A status dashboard (service health, disk, queue size, certificate expiry) and
+mail queue management (view, flush, delete) are now included, and certificate
+renewal runs automatically. Alerting and log rotation are still planned.
+- Status: **planned** (alerting, log rotation).

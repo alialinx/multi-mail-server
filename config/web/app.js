@@ -9,7 +9,7 @@ const API = "/api";
 const TOKEN_KEY = "mp_token";
 
 const state = {
-    view: "domains",
+    view: "dashboard",
     domains: [],
 };
 
@@ -208,9 +208,11 @@ function renderLogin() {
    Shell + navigation
    ============================================================ */
 const NAV = [
+    { key: "dashboard", label: "Dashboard", ico: "📊" },
     { key: "domains", label: "Domains", ico: "🌐" },
     { key: "users", label: "Users", ico: "👤" },
     { key: "aliases", label: "Aliases", ico: "↪" },
+    { key: "queue", label: "Mail queue", ico: "📬" },
     { key: "certs", label: "Certificates", ico: "🔒" },
 ];
 
@@ -249,7 +251,7 @@ function go(view) {
     document.querySelectorAll(".nav a[data-view]").forEach((a) => a.classList.toggle("active", a.dataset.view === view));
     $("#page-title").textContent = NAV.find((n) => n.key === view).label;
     $("#topbar-actions").innerHTML = "";
-    const views = { domains: viewDomains, users: viewUsers, aliases: viewAliases, certs: viewCerts };
+    const views = { dashboard: viewDashboard, domains: viewDomains, users: viewUsers, aliases: viewAliases, queue: viewQueue, certs: viewCerts };
     views[view]();
 }
 
@@ -588,7 +590,7 @@ async function viewCerts() {
         <div class="card">
             <div class="card-head"><h3>Renew all</h3></div>
             <div class="card-body">
-                <p class="muted" style="margin:0 0 14px">Renew every certificate that is due. Restarts HAProxy briefly.</p>
+                <p class="muted" style="margin:0 0 14px">Certificates renew automatically twice a day. Use this only to force a renewal now. Restarts HAProxy briefly. Expiry dates are on the Dashboard.</p>
                 <button id="renew-all">Renew all certificates</button>
             </div>
         </div>`;
@@ -612,6 +614,123 @@ async function viewCerts() {
             toast("Renewal finished");
         } catch (err) { toast(err.message, "error"); }
         btn.disabled = false; btn.textContent = "Renew all certificates";
+    });
+}
+
+/* ============================================================
+   Dashboard
+   ============================================================ */
+function fmtBytes(b) {
+    if (b == null) return "-";
+    const u = ["B", "KB", "MB", "GB", "TB"];
+    let i = 0, n = b;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return `${n.toFixed(1)} ${u[i]}`;
+}
+
+async function viewDashboard() {
+    loading();
+    let s;
+    try { s = await api("GET", "/status"); }
+    catch (e) { return errorState(e); }
+
+    const stat = (label, value, sub = "", kind = "") =>
+        `<div class="stat ${kind}"><div class="stat-val">${value}</div><div class="stat-label">${esc(label)}</div>${sub ? `<div class="stat-sub">${esc(sub)}</div>` : ""}</div>`;
+
+    const services = s.services.map((sv) =>
+        `<div class="svc"><span class="dot ${sv.up ? "ok" : "bad"}"></span><span class="svc-name">${esc(sv.name)}</span><span class="svc-status muted">${esc(sv.status)}</span></div>`).join("");
+
+    const certRows = s.certs.length ? s.certs.map((c) => {
+        let badge;
+        if (!c.valid) badge = '<span class="badge off">missing</span>';
+        else if (c.days_left != null && c.days_left < 15) badge = `<span class="badge warn-b">${c.days_left}d left</span>`;
+        else badge = '<span class="badge ok">valid</span>';
+        return `<tr><td><strong>${esc(c.domain)}</strong></td><td>${badge}</td><td class="muted">${c.valid ? esc(c.expires) : "-"}</td></tr>`;
+    }).join("") : `<tr><td colspan="3" class="empty">No domains yet.</td></tr>`;
+
+    const d = s.disk;
+    const diskKind = d.percent >= 90 ? "bad" : d.percent >= 75 ? "warn" : "";
+
+    $("#content").innerHTML = `
+        <div class="stats">
+            ${stat("Domains", s.domains.active, `${s.domains.total} total`)}
+            ${stat("Users", s.users)}
+            ${stat("Aliases", s.aliases)}
+            ${stat("Mail queue", s.queue.count, s.queue.count ? "needs attention" : "empty", s.queue.count ? "warn" : "")}
+        </div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-head"><h3>Services</h3></div>
+                <div class="card-body svc-grid">${services}</div>
+            </div>
+            <div class="card">
+                <div class="card-head"><h3>Disk</h3></div>
+                <div class="card-body">
+                    <div class="bar"><div class="bar-fill ${diskKind}" style="width:${d.percent}%"></div></div>
+                    <p class="muted" style="margin:12px 0 0">${fmtBytes(d.used)} / ${fmtBytes(d.total)} used (${d.percent}%) · ${fmtBytes(d.free)} free</p>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-head"><h3>Certificates</h3><span class="muted">renewed automatically</span></div>
+            <table><thead><tr><th>Domain</th><th>Status</th><th>Expires</th></tr></thead><tbody>${certRows}</tbody></table>
+        </div>`;
+}
+
+/* ============================================================
+   Mail queue
+   ============================================================ */
+async function viewQueue() {
+    loading();
+    let items;
+    try { items = await api("GET", "/queue"); }
+    catch (e) { return errorState(e); }
+
+    const rows = items.length ? items.map((m) => `
+        <tr>
+            <td class="mono">${esc(m.id)}</td>
+            <td><span class="badge neutral">${esc(m.queue)}</span></td>
+            <td class="mono">${esc(m.sender)}</td>
+            <td class="mono">${esc((m.recipients || []).join(", "))}</td>
+            <td class="muted" style="max-width:260px;word-break:break-word">${esc(m.reason || "")}</td>
+            <td class="actions"><button class="danger sm" data-act="del" data-id="${esc(m.id)}">Delete</button></td>
+        </tr>`).join("") : `<tr><td colspan="6" class="empty">Queue is empty 🎉</td></tr>`;
+
+    $("#content").innerHTML = `
+        <div class="card">
+            <div class="card-head">
+                <h3>Mail queue</h3>
+                <div class="row-gap">
+                    <span class="muted">${items.length} message(s)</span>
+                    <button class="ghost sm" id="q-flush">Flush all</button>
+                    ${items.length ? '<button class="danger sm" id="q-delall">Delete all</button>' : ""}
+                </div>
+            </div>
+            <table><thead><tr><th>ID</th><th>Queue</th><th>Sender</th><th>Recipients</th><th>Reason</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+        </div>
+        <p class="hint">Flush retries delivery now. Deferred messages are retried automatically by Postfix until they expire.</p>`;
+
+    $("#q-flush").addEventListener("click", async (e) => {
+        const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spinner"></span>';
+        try { await api("POST", "/queue/flush"); toast("Queue flush triggered"); viewQueue(); }
+        catch (err) { toast(err.message, "error"); b.disabled = false; b.textContent = "Flush all"; }
+    });
+
+    const delAll = $("#q-delall");
+    if (delAll) delAll.addEventListener("click", () => {
+        confirmAction("Delete ALL queued messages? This cannot be undone.", async () => {
+            await api("DELETE", "/queue/ALL"); toast("Queue cleared"); viewQueue();
+        }, { confirmLabel: "Delete all", danger: true });
+    });
+
+    // delegate row deletes on the table (fresh node each render, so no stacking)
+    const table = $("#content table");
+    if (table) table.addEventListener("click", (e) => {
+        const btn = e.target.closest('button[data-act="del"]');
+        if (!btn) return;
+        confirmAction(`Delete message ${btn.dataset.id}?`, async () => {
+            await api("DELETE", `/queue/${encodeURIComponent(btn.dataset.id)}`); toast("Message deleted"); viewQueue();
+        }, { confirmLabel: "Delete", danger: true });
     });
 }
 

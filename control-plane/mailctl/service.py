@@ -2,7 +2,7 @@ import subprocess
 
 from sqlalchemy import select
 
-from . import certs, checks, dkim, dns, reconcile, sieve, validators
+from . import certs, checks, dkim, dns, mailqueue, reconcile, sieve, status, validators
 from .db import Alias, Domain, SessionLocal, User, init_db
 from .passwords import hash_password
 
@@ -301,3 +301,21 @@ def renew_certs():
     certs.renew()
     reconcile.reconcile_all()
     return {"renewed": True}
+
+
+def get_status():
+    return status.get_status()
+
+
+def list_queue():
+    return mailqueue.list_queue()
+
+
+def flush_queue():
+    return mailqueue.flush_queue()
+
+
+def delete_queue(queue_id):
+    if queue_id.upper() != "ALL" and not mailqueue.QUEUE_ID_RE.match(queue_id):
+        raise ServiceError(f"invalid queue id: {queue_id}")
+    return mailqueue.delete(queue_id)

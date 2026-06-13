@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text, create_engine
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from .config import DATABASE_URL
@@ -46,6 +46,16 @@ class Alias(Base):
     goto_address: Mapped[str] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class MailStat(Base):
+    __tablename__ = "mail_stats"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[str] = mapped_column(String(10))        # YYYY-MM-DD
+    domain: Mapped[str] = mapped_column(String(255))
+    direction: Mapped[str] = mapped_column(String(10))  # in | out | bounce
+    count: Mapped[int] = mapped_column(Integer, default=0)
 
 
 def init_db():

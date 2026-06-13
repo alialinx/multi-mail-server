@@ -1,18 +1,21 @@
+import asyncio
 import threading
 import time
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .. import auth, service
+from .. import auth, logs, service
+from ..db import init_db
 from ..service import ServiceError
 
 app = FastAPI(title="Mail Platform API", version="0.1.0")
 
 RENEW_INTERVAL_SECONDS = 12 * 3600
+MAILSTATS_INTERVAL_SECONDS = 600
 
 
 def _renew_loop():
@@ -27,9 +30,57 @@ def _renew_loop():
         time.sleep(RENEW_INTERVAL_SECONDS)
 
 
+def _mailstats_loop():
+    while True:
+        try:
+            service.update_mailstats()
+        except Exception:
+            pass
+        time.sleep(MAILSTATS_INTERVAL_SECONDS)
+
+
 @app.on_event("startup")
-def start_cert_renewal():
+def start_background():
+    try:
+        init_db()   # ensure newer tables (e.g. mail_stats) exist on upgrades
+    except Exception:
+        pass
     threading.Thread(target=_renew_loop, daemon=True).start()
+    threading.Thread(target=_mailstats_loop, daemon=True).start()
+
+
+@app.websocket("/ws/logs")
+async def ws_logs(ws: WebSocket, source: str = "postfix", token: str = "", noise: bool = False):
+    # browsers can't set auth headers on a WebSocket, so the token comes as a query param
+    if not auth.verify_token(token):
+        await ws.close(code=1008)
+        return
+    await ws.accept()
+    container, path = logs.SOURCES.get(source, logs.SOURCES["postfix"])
+    proc = await asyncio.create_subprocess_exec(
+        "docker", "exec", container, "tail", "-n", "50", "-F", path,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            text = line.decode("utf-8", "replace").rstrip("\n")
+            if not text or (not noise and "127.0.0.1" in text):
+                continue
+            await ws.send_text(text)
+    except (WebSocketDisconnect, ConnectionError, RuntimeError):
+        pass
+    finally:
+        try:
+            proc.terminate()
+        except ProcessLookupError:
+            pass
+        try:
+            await proc.wait()
+        except Exception:
+            pass
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
@@ -217,6 +268,11 @@ def status():
 @api.get("/stats")
 def stats():
     return ok(service.get_stats())
+
+
+@api.get("/mailstats")
+def mailstats(days: int = 30, domain: str = ""):
+    return ok(service.mail_series(days, domain or None))
 
 
 @api.get("/logs")

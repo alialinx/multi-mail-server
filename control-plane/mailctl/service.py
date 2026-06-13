@@ -3,7 +3,7 @@ import subprocess
 from sqlalchemy import select
 
 from . import (
-    bans, certs, checks, dkim, dns, logs, mailqueue,
+    bans, certs, checks, dkim, dns, logs, mailqueue, mailstats,
     reconcile, sieve, stats, status, usage, validators,
 )
 from .db import Alias, Domain, SessionLocal, User, init_db
@@ -312,6 +312,14 @@ def get_status():
 
 def get_stats():
     return stats.get_stats()
+
+
+def update_mailstats():
+    return mailstats.update()
+
+
+def mail_series(days=30, domain=None):
+    return mailstats.series(days, domain)
 
 
 def users_usage():

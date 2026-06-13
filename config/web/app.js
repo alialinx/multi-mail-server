@@ -246,8 +246,9 @@ function renderShell() {
 
 function go(view) {
     state.view = view;
-    // stop any live polling (dashboard resources, live logs) from the old view
+    // stop any live polling / sockets from the old view
     ["_statsTimer", "_logTimer"].forEach((k) => { if (state[k]) { clearInterval(state[k]); state[k] = null; } });
+    if (state._logWs) { try { state._logWs.close(); } catch (e) {} state._logWs = null; }
     // #content persists across navigation; replace it so delegated click
     // listeners from the previous view do not stack up on the same node.
     const old = $("#content");
@@ -322,7 +323,7 @@ async function viewDomains() {
 }
 
 async function onDomainAction(e) {
-    const btn = e.target.closest("button[data-act]");
+    const btn = e.target.closest("[data-act]");
     if (!btn) return;
     const name = btn.dataset.name;
     const act = btn.dataset.act;
@@ -685,6 +686,57 @@ async function refreshStats() {
         </div>`).join("");
 }
 
+// dependency-free grouped bar chart for daily mail traffic
+function trafficChart(d) {
+    const n = d.days.length;
+    const series = [
+        { key: "in", color: "var(--accent)", label: "Received" },
+        { key: "out", color: "var(--ok)", label: "Sent" },
+        { key: "bounce", color: "var(--danger)", label: "Bounced" },
+    ];
+    const max = Math.max(1, ...d.in, ...d.out, ...d.bounce);
+    const W = 920, H = 240, padL = 36, padR = 10, padT = 12, padB = 38;
+    const plotH = H - padT - padB, plotW = W - padL - padR;
+    const groupW = plotW / n;
+    const barW = Math.max(1.5, Math.min(groupW / 3.6, 9));
+    const y = (v) => padT + plotH * (1 - v / max);
+
+    let bars = "";
+    for (let i = 0; i < n; i++) {
+        const gx = padL + groupW * i + (groupW - barW * 3) / 2;
+        series.forEach((s, si) => {
+            const v = d[s.key][i];
+            if (!v) return;
+            bars += `<rect x="${(gx + si * barW).toFixed(1)}" y="${y(v).toFixed(1)}" width="${barW.toFixed(1)}" height="${(padT + plotH - y(v)).toFixed(1)}" fill="${s.color}" rx="1"><title>${d.days[i]} — ${s.label}: ${v}</title></rect>`;
+        });
+    }
+    let xlabels = "";
+    const step = Math.max(1, Math.ceil(n / 7));
+    for (let i = 0; i < n; i += step) {
+        xlabels += `<text x="${(padL + groupW * i + groupW / 2).toFixed(1)}" y="${H - 14}" text-anchor="middle" class="ax">${d.days[i].slice(5)}</text>`;
+    }
+    const baseline = `<line x1="${padL}" y1="${y(0)}" x2="${W - padR}" y2="${y(0)}" class="axline"></line>`;
+    const ylabels = `<text x="${padL - 6}" y="${(y(max) + 4).toFixed(1)}" text-anchor="end" class="ax">${max}</text><text x="${padL - 6}" y="${y(0).toFixed(1)}" text-anchor="end" class="ax">0</text>`;
+    const legend = series.map((s) => `<span class="lg"><span class="lg-dot" style="background:${s.color}"></span>${s.label}</span>`).join("");
+    return `<div class="legend">${legend}</div><svg viewBox="0 0 ${W} ${H}" class="chart">${baseline}${ylabels}${bars}${xlabels}</svg>`;
+}
+
+async function loadTraffic(domain) {
+    const box = $("#traffic");
+    if (!box) return;
+    try {
+        const d = await api("GET", `/mailstats?days=30${domain ? `&domain=${encodeURIComponent(domain)}` : ""}`);
+        const sel = $("#t-domain");
+        if (sel && sel.options.length <= 1 && d.domains.length) {
+            d.domains.forEach((dm) => { const o = document.createElement("option"); o.value = dm; o.textContent = dm; sel.appendChild(o); });
+        }
+        const tIn = d.in.reduce((a, b) => a + b, 0), tOut = d.out.reduce((a, b) => a + b, 0), tB = d.bounce.reduce((a, b) => a + b, 0);
+        box.innerHTML = (tIn + tOut + tB)
+            ? trafficChart(d) + `<p class="muted" style="margin:10px 0 0">30 days — received ${tIn} · sent ${tOut} · bounced ${tB}</p>`
+            : '<p class="empty">No mail traffic recorded yet. Send or receive some mail, then check back.</p>';
+    } catch (e) { box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+
 async function viewDashboard() {
     loading();
     let s;
@@ -725,6 +777,13 @@ async function viewDashboard() {
                 <div id="ctr-stats" class="ctr-stats"><div class="empty"><span class="spinner" style="border-color:#ccc;border-top-color:var(--accent)"></span></div></div>
             </div>
         </div>
+        <div class="card">
+            <div class="card-head">
+                <h3>Mail traffic</h3>
+                <select id="t-domain" style="width:auto"><option value="">All domains</option></select>
+            </div>
+            <div class="card-body" id="traffic"><div class="empty"><span class="spinner" style="border-color:#ccc;border-top-color:var(--accent)"></span></div></div>
+        </div>
         <div class="grid-2">
             <div class="card">
                 <div class="card-head"><h3>Services</h3></div>
@@ -738,6 +797,9 @@ async function viewDashboard() {
 
     refreshStats();
     state._statsTimer = setInterval(refreshStats, 5000);
+
+    loadTraffic("");
+    $("#t-domain").addEventListener("change", (e) => loadTraffic(e.target.value));
 }
 
 /* ============================================================
@@ -832,7 +894,7 @@ async function viewLogs() {
             </div>
             <div class="card-body"><pre class="logbox" id="l-out"><span class="muted">Loading…</span></pre></div>
         </div>
-        <p class="hint">Last 300 lines (or matches when you search). HAProxy health-check chatter is hidden by default. Tip: paste a recipient or message-id to trace one mail.</p>`;
+        <p class="hint">Last 300 lines (or matches when you search). <b>Live</b> streams new lines in real time over a socket. HAProxy health-check chatter is hidden by default. Tip: paste a recipient or message-id to trace one mail.</p>`;
 
     const load = async (quiet) => {
         const out = $("#l-out");
@@ -847,15 +909,39 @@ async function viewLogs() {
         } catch (e) { if (!quiet) out.textContent = e.message; }
     };
 
-    $("#l-source").addEventListener("change", () => { state._logSource = $("#l-source").value; load(); });
-    $("#l-go").addEventListener("click", () => { state._logQuery = $("#l-q").value.trim(); load(); });
-    $("#l-noise").addEventListener("change", () => load());
-    $("#l-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { state._logQuery = $("#l-q").value.trim(); load(); } });
-    $("#l-live").addEventListener("change", (e) => {
-        if (state._logTimer) { clearInterval(state._logTimer); state._logTimer = null; }
-        if (e.target.checked) state._logTimer = setInterval(() => load(true), 3000);
-    });
+    const relive = () => { if ($("#l-live").checked) { closeLogWs(); openLogWs(); } else { load(); } };
+    $("#l-source").addEventListener("change", () => { state._logSource = $("#l-source").value; relive(); });
+    $("#l-noise").addEventListener("change", relive);
+    $("#l-go").addEventListener("click", () => { $("#l-live").checked = false; closeLogWs(); state._logQuery = $("#l-q").value.trim(); load(); });
+    $("#l-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { $("#l-go").click(); } });
+    $("#l-live").addEventListener("change", (e) => { closeLogWs(); if (e.target.checked) openLogWs(); else load(); });
     load();
+}
+
+function openLogWs() {
+    const out = $("#l-out");
+    if (!out) return;
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const src = encodeURIComponent($("#l-source").value);
+    const noise = $("#l-noise").checked ? "1" : "0";
+    const ws = new WebSocket(`${proto}//${location.host}/api/ws/logs?source=${src}&noise=${noise}&token=${encodeURIComponent(getToken())}`);
+    state._logWs = ws;
+    out.textContent = "";
+    ws.onmessage = (ev) => {
+        const o = $("#l-out");
+        if (!o) return;
+        const atBottom = o.scrollTop + o.clientHeight >= o.scrollHeight - 30;
+        o.textContent += (o.textContent ? "\n" : "") + ev.data;
+        const lines = o.textContent.split("\n");
+        if (lines.length > 600) o.textContent = lines.slice(-600).join("\n");
+        if (atBottom) o.scrollTop = o.scrollHeight;
+    };
+    ws.onclose = () => { if (state._logWs === ws) state._logWs = null; };
+    ws.onerror = () => toast("Live log connection failed", "error");
+}
+
+function closeLogWs() {
+    if (state._logWs) { try { state._logWs.close(); } catch (e) {} state._logWs = null; }
 }
 
 /* ============================================================
@@ -900,7 +986,7 @@ function loadDomainBadges() {
             const okCount = checkable.filter((i) => i.ok === true).length;
             const cls = okCount === total && total > 0 ? "ok" : okCount >= total - 1 ? "warn-b" : "off";
             const tip = items.map((i) => `${i.check}: ${i.ok === true ? "ok" : i.ok === false ? "fail" : "?"}`).join(" · ");
-            cell.innerHTML = `<span class="badge ${cls}" title="${esc(tip)}">${okCount}/${total} ✓</span>`;
+            cell.innerHTML = `<span class="badge ${cls} dchip" data-act="check" data-name="${esc(name)}" title="Click for details — ${esc(tip)}">${okCount}/${total} checks ✓</span>`;
         } catch {
             cell.innerHTML = '<span class="muted">—</span>';
         }

@@ -76,6 +76,8 @@ Renewal also runs automatically in the background twice a day, so you rarely nee
 |---|---|---|
 | GET | /status | dashboard data: domain/user/alias counts, service health, disk usage, mail queue size, per-domain certificate expiry |
 | GET | /stats | live CPU and memory usage per container plus host totals (from `docker stats`) |
+| GET | /mailstats?days=30&domain= | daily sent/received/bounced counts per day; optional `domain` filter |
+| WS | /ws/logs?source=postfix&token=&noise=0 | WebSocket that streams new log lines live (`tail -f`); token is the bearer token as a query param |
 | GET | /queue | list queued messages (id, sender, recipients, queue, delay reason) |
 | POST | /queue/flush | retry delivery of the whole queue now |
 | DELETE | /queue/{id} | delete one message; use `ALL` to delete the whole queue |

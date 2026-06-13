@@ -220,8 +220,8 @@ def stats():
 
 
 @api.get("/logs")
-def logs(source: str = "postfix", q: str = "", limit: int = 200):
-    return ok(service.get_logs(source, q, limit))
+def logs(source: str = "postfix", q: str = "", limit: int = 200, noise: bool = False):
+    return ok(service.get_logs(source, q, limit, noise))
 
 
 @api.get("/fail2ban")

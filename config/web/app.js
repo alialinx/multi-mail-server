@@ -246,8 +246,8 @@ function renderShell() {
 
 function go(view) {
     state.view = view;
-    // stop any live polling (e.g. the dashboard resource refresh) from the old view
-    if (state._statsTimer) { clearInterval(state._statsTimer); state._statsTimer = null; }
+    // stop any live polling (dashboard resources, live logs) from the old view
+    ["_statsTimer", "_logTimer"].forEach((k) => { if (state[k]) { clearInterval(state[k]); state[k] = null; } });
     // #content persists across navigation; replace it so delegated click
     // listeners from the previous view do not stack up on the same node.
     const old = $("#content");
@@ -824,28 +824,37 @@ async function viewLogs() {
                         <option value="postfix" ${src === "postfix" ? "selected" : ""}>Postfix (SMTP)</option>
                         <option value="dovecot" ${src === "dovecot" ? "selected" : ""}>Dovecot (IMAP)</option>
                     </select>
-                    <input id="l-q" placeholder="search: email, message-id…" value="${esc(q)}" style="width:240px">
+                    <input id="l-q" placeholder="search: email, message-id…" value="${esc(q)}" style="width:220px">
                     <button class="ghost sm" id="l-go">Search</button>
-                    <button class="ghost sm" id="l-refresh">Refresh</button>
+                    <label class="row-gap" style="gap:5px;font-weight:500;cursor:pointer"><input type="checkbox" id="l-live" style="width:auto"> Live</label>
+                    <label class="row-gap" style="gap:5px;font-weight:500;cursor:pointer"><input type="checkbox" id="l-noise" style="width:auto"> Show health checks</label>
                 </div>
             </div>
             <div class="card-body"><pre class="logbox" id="l-out"><span class="muted">Loading…</span></pre></div>
         </div>
-        <p class="hint">Shows the last 300 lines, or matching lines when you search. Tip: paste a recipient address or message-id to trace a single mail.</p>`;
+        <p class="hint">Last 300 lines (or matches when you search). HAProxy health-check chatter is hidden by default. Tip: paste a recipient or message-id to trace one mail.</p>`;
 
-    const load = async () => {
+    const load = async (quiet) => {
         const out = $("#l-out");
-        out.innerHTML = '<span class="muted">Loading…</span>';
+        if (!out) return;
+        if (!quiet) out.innerHTML = '<span class="muted">Loading…</span>';
+        const noise = $("#l-noise").checked ? "&noise=1" : "";
         try {
-            const r = await api("GET", `/logs?source=${encodeURIComponent($("#l-source").value)}&q=${encodeURIComponent($("#l-q").value.trim())}&limit=300`);
+            const r = await api("GET", `/logs?source=${encodeURIComponent($("#l-source").value)}&q=${encodeURIComponent($("#l-q").value.trim())}&limit=300${noise}`);
+            const atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
             out.textContent = r.lines.length ? r.lines.join("\n") : "No matching log lines.";
-            out.scrollTop = out.scrollHeight;
-        } catch (e) { out.textContent = e.message; }
+            if (atBottom || !quiet) out.scrollTop = out.scrollHeight;
+        } catch (e) { if (!quiet) out.textContent = e.message; }
     };
+
     $("#l-source").addEventListener("change", () => { state._logSource = $("#l-source").value; load(); });
     $("#l-go").addEventListener("click", () => { state._logQuery = $("#l-q").value.trim(); load(); });
-    $("#l-refresh").addEventListener("click", load);
+    $("#l-noise").addEventListener("change", () => load());
     $("#l-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { state._logQuery = $("#l-q").value.trim(); load(); } });
+    $("#l-live").addEventListener("change", (e) => {
+        if (state._logTimer) { clearInterval(state._logTimer); state._logTimer = null; }
+        if (e.target.checked) state._logTimer = setInterval(() => load(true), 3000);
+    });
     load();
 }
 

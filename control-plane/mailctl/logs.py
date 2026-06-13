@@ -6,7 +6,7 @@ SOURCES = {
 }
 
 
-def tail(source="postfix", q="", limit=200):
+def tail(source="postfix", q="", limit=200, include_noise=False):
     if source not in SOURCES:
         source = "postfix"
     try:
@@ -22,9 +22,16 @@ def tail(source="postfix", q="", limit=200):
             capture_output=True, text=True,
         )
     else:
+        # fetch extra so we still return `limit` real lines after dropping noise
+        fetch = limit if include_noise else min(limit * 6, 6000)
         result = subprocess.run(
-            ["docker", "exec", container, "tail", "-n", str(limit), path],
+            ["docker", "exec", container, "tail", "-n", str(fetch), path],
             capture_output=True, text=True,
         )
+
     lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if not include_noise:
+        # HAProxy health-check chatter is all from localhost (127.0.0.1);
+        # real client/relay lines carry the actual IP, so this is safe to hide.
+        lines = [line for line in lines if "127.0.0.1" not in line]
     return {"source": source, "lines": lines[-limit:]}

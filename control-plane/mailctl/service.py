@@ -318,10 +318,10 @@ def users_usage():
     return usage.usage()
 
 
-def get_logs(source="postfix", q="", limit=200):
+def get_logs(source="postfix", q="", limit=200, include_noise=False):
     if q and len(q) > 200:
         raise ServiceError("search query too long")
-    return logs.tail(source, q, limit)
+    return logs.tail(source, q, limit, include_noise)
 
 
 def fail2ban_status():

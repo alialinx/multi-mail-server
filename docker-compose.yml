@@ -175,9 +175,27 @@ services:
       postgres:
         condition: service_healthy
 
+  web:
+    image: nginx:alpine
+    container_name: web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT}:80"
+    volumes:
+      - ./config/nginx/web.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./config/web:/usr/share/nginx/html:ro
+    networks:
+      - mailnet
+    depends_on:
+      - api
+
 networks:
   mailnet:
     name: mailnet
+    ipam:
+      config:
+        - subnet: 10.123.0.0/24
+          gateway: 10.123.0.1
 
 volumes:
   pgdata:

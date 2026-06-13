@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from .config import DATABASE_URL
@@ -59,4 +60,10 @@ class MailStat(Base):
 
 
 def init_db():
-    Base.metadata.create_all(engine)
+    try:
+        Base.metadata.create_all(engine)
+    except (IntegrityError, ProgrammingError):
+        # The API startup thread and the bootstrap step can both create the
+        # tables at the same time; the definitions are identical, so a
+        # duplicate-table race here is safe to ignore.
+        pass

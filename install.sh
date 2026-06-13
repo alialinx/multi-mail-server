@@ -35,7 +35,15 @@ if [ ! -f .env ]; then
     read -rp "    Server public IP [$detected_ip]: " server_ip
     server_ip="${server_ip:-$detected_ip}"
 
-    read -rp "    Mail hostname (e.g. mx.example.com): " mail_hostname
+    while :; do
+        read -rp "    Mail hostname (e.g. mx.example.com): " mail_hostname
+        # strip stray/control/non-ascii bytes that a bad paste can introduce
+        mail_hostname=$(printf '%s' "$mail_hostname" | tr -cd 'a-zA-Z0-9.-')
+        if printf '%s' "$mail_hostname" | grep -qE '^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'; then
+            break
+        fi
+        echo "    Please enter a valid hostname like mx.example.com."
+    done
 
     read -rp "    ACME email (Let's Encrypt): " acme_email
 

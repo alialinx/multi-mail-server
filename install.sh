@@ -42,6 +42,9 @@ if [ ! -f .env ]; then
     read -rp "    API port (not 8000) [8080]: " api_port
     api_port="${api_port:-8080}"
 
+    read -rp "    Web panel port [3000]: " web_port
+    web_port="${web_port:-3000}"
+
     read -rp "    Admin username [admin]: " admin_user
     admin_user="${admin_user:-admin}"
 
@@ -58,6 +61,7 @@ ACME_EMAIL=${acme_email}
 ACME_SERVER=https://acme-v02.api.letsencrypt.org/directory
 
 API_PORT=${api_port}
+WEB_PORT=${web_port}
 
 ADMIN_USER=${admin_user}
 ADMIN_PASSWORD=${admin_password}
@@ -92,13 +96,18 @@ step 6 "Starting all services"
 docker compose up -d
 
 api_port="$(grep '^API_PORT=' .env | cut -d= -f2)"
+web_port="$(grep '^WEB_PORT=' .env | cut -d= -f2)"
 public_ip="$(grep '^SERVER_IP=' .env | cut -d= -f2)"
 
 echo ""
 echo "============================================================"
 echo " Install complete."
 echo ""
-echo " Open the Swagger UI to manage everything:"
+echo " Web panel (recommended):"
+echo "   http://${public_ip}:${web_port}/"
+echo " Swagger UI (raw API):"
 echo "   http://${public_ip}:${api_port}/docs"
-echo " Click Authorize and log in with your admin username and password."
+echo ""
+echo " Log in with your admin username and password."
+echo " Open only the web and API ports to your own IP in the firewall."
 echo "============================================================"

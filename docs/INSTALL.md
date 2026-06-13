@@ -8,7 +8,7 @@
 
 Docker is installed automatically by `install.sh` if it is missing.
 
-You open the firewall yourself; the installer does not touch it. Open: 25, 80, 143, 443, 465, 587, 993 to the internet, and the API port (default 8080) only to your own IP.
+You open the firewall yourself; the installer does not touch it. Open: 25, 80, 143, 443, 465, 587, 993 to the internet, and the web port (default 3000) and API port (default 8080) only to your own IP.
 
 ## Steps
 
@@ -26,18 +26,21 @@ cd mail-platform
 | Mail hostname | One name for the server itself, like `mx.example.com`. Not one per domain. | The server announces this name when it sends mail (HELO) and your PTR points to it. See [DNS.md](DNS.md). |
 | ACME email | Your email address. | Let's Encrypt uses it for certificate expiry notices. |
 | API port | Port for the admin API, default 8080. Any port except 8000. | This is where you open the Swagger UI. |
-| Admin username | Login name for the API, default `admin`. | Used to log in to Swagger. |
-| Admin password | Login password. It is typed hidden, so nothing shows on screen. That is normal. | Used to log in to Swagger. Save it somewhere. |
+| Web panel port | Port for the admin web panel, default 3000. | This is where you open the browser panel. |
+| Admin username | Login name, default `admin`. | Used to log in to the web panel and Swagger. |
+| Admin password | Login password. It is typed hidden, so nothing shows on screen. That is normal. | Used to log in to the web panel and Swagger. Save it somewhere. |
 
 The installer also generates random secrets (database password, API key, JWT secret) and writes them to `.env`. You do not type these.
 
 Then it builds the images, starts the database and API, creates the database tables and base config, and starts the rest of the stack. When it finishes it prints the Swagger UI address.
 
-## Manage everything from Swagger
+## Manage everything from the web panel
 
-Open `http://<server>:<API_PORT>/docs`. Click **Authorize** and log in with your admin username and password.
+Open `http://<server>:<WEB_PORT>/` and log in with your admin username and password. From there you manage domains, users, aliases, quota, auto-reply and certificates. The panel is a static UI served by its own nginx container; it calls the same API, proxied at `/api/`, so only the web port needs to be reachable from your browser.
 
-Full endpoint list is in [API.md](API.md). The common flow:
+If you prefer raw REST, the Swagger UI is at `http://<server>:<API_PORT>/docs` (click **Authorize**, same credentials). Full endpoint list is in [API.md](API.md).
+
+The common flow:
 
 1. `POST /domains` with `{ "name": "example.com" }`. The response has the DNS records to set.
 2. Set the A and MX records, wait for them to propagate.

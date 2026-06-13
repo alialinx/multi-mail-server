@@ -35,6 +35,11 @@ The REST API can do everything, including operations that use the Docker socket.
 Passwords are sent in the body of `POST /users` and `PUT /users/{email}/password`.
 - Status: **accepted**. Use HTTPS for the API and do not log request bodies. Passwords are stored hashed as SHA512-CRYPT.
 
+### Web panel exposes the same control as the API
+The web panel (default port 3000) reverse-proxies `/api/` to the control plane, so anyone who can reach it and log in can do everything the API can.
+- Status: **mitigated**. The panel ships no credentials; it stores only the bearer token the user gets after logging in with the admin username and password. The token is held in the browser and expires after 8 hours.
+- Also do: open the web port only to your own IP in the firewall, like the API port, and put it behind HTTPS in production so the login and token are not sent in clear text.
+
 ## Availability and operations
 
 ### Single server, no high availability

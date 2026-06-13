@@ -27,6 +27,7 @@ Each part runs in its own container. They are wired with one Docker network call
 | certbot | Gets and renews all certificates |
 | fail2ban | Bans IPs that brute-force SMTP or IMAP login |
 | api | The REST API, the reconcile logic, and the bootstrap step. This is the control plane |
+| web | A static admin panel (nginx) that calls the API. Serves the UI and reverse-proxies `/api/` to the api container |
 
 ## Ports and client IP
 

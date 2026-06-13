@@ -12,6 +12,7 @@ Built on Postfix, Dovecot, PostgreSQL, OpenDKIM, HAProxy, Traefik and Let's Encr
 - Automatic TLS certificates
 - One PostgreSQL database as the single source of truth
 - A REST API with a Swagger UI for all administration
+- A web admin panel for domains, users, aliases and certificates
 
 ## Requirements
 
@@ -30,6 +31,7 @@ The installer does not change your firewall. Open these yourself:
 | 25, 465, 587 | SMTP (receive and send) |
 | 143, 993 | IMAP |
 | 80, 443 | HTTP and HTTPS (certificates, web) |
+| Web port (default 3000) | admin web panel, open only to your own IP |
 | API port (default 8080) | admin API, open only to your own IP |
 
 ## Quick start
@@ -40,9 +42,12 @@ cd mail-platform
 ./install.sh
 ```
 
-When it finishes it prints the Swagger UI address, for example `http://<server>:8080/docs`. You manage everything from there: domains, users, aliases, forwarding, quota, auto-reply and certificates. The API key is in `.env`.
+When it finishes it prints two addresses:
 
-Add a domain with `POST /domains`, set the DNS records it returns, then add a user with `POST /users`.
+- The web panel, for example `http://<server>:3000/` - log in with your admin username and password and manage domains, users, aliases, forwarding, quota, auto-reply and certificates from the browser.
+- The Swagger UI, for example `http://<server>:8080/docs` - the same operations as raw REST.
+
+Add a domain, set the DNS records it returns, then add a user.
 
 ## Documentation
 
@@ -54,4 +59,4 @@ Add a domain with `POST /domains`, set the DNS records it returns, then add a us
 
 ## Status
 
-Phase 1. REST API with Swagger and the full mail stack work. A web panel comes later.
+Phase 1. The full mail stack, the REST API with Swagger, and a web admin panel all work.

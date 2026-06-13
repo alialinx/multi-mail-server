@@ -268,6 +268,30 @@ td.actions button { margin-left: 6px; }
 
 .badge.warn-b { background: #fbeed0; color: var(--warn); }
 
+/* donut gauges */
+.donuts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 18px; }
+.donut { text-align: center; }
+.donut svg { width: 120px; height: 120px; }
+.donut-bg { fill: none; stroke: var(--surface-2); stroke-width: 10; }
+.donut-fg { fill: none; stroke-width: 10; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .4s; }
+.donut-num { font-size: 22px; font-weight: 700; fill: var(--text); font-family: "Inter", sans-serif; }
+.donut-label { font-weight: 600; margin-top: 4px; }
+.donut-sub { font-size: 12px; }
+
+/* per-container resource rows */
+.ctr-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; }
+.ctr { display: grid; grid-template-columns: 84px 1fr; align-items: center; gap: 4px 10px; padding: 5px 0; border-top: 1px solid var(--border); }
+.ctr-name { grid-row: span 2; font-weight: 600; font-size: 13px; }
+.ctr-bar { display: flex; align-items: center; gap: 8px; }
+.ctr-tag { font-size: 10px; font-weight: 700; color: var(--muted); width: 30px; }
+.ctr-pct { font-size: 11px; color: var(--muted); white-space: nowrap; min-width: 84px; }
+.bar.mini { height: 7px; flex: 1; }
+
+@media (max-width: 820px) {
+    .donuts { grid-template-columns: 1fr; }
+    .ctr-stats { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 820px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
     .grid-2 { grid-template-columns: 1fr; }

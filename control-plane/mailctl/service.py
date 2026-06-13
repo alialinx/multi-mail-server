@@ -2,7 +2,7 @@ import subprocess
 
 from sqlalchemy import select
 
-from . import certs, checks, dkim, dns, mailqueue, reconcile, sieve, status, validators
+from . import certs, checks, dkim, dns, mailqueue, reconcile, sieve, stats, status, validators
 from .db import Alias, Domain, SessionLocal, User, init_db
 from .passwords import hash_password
 
@@ -305,6 +305,10 @@ def renew_certs():
 
 def get_status():
     return status.get_status()
+
+
+def get_stats():
+    return stats.get_stats()
 
 
 def list_queue():

@@ -74,6 +74,7 @@ Renewal also runs automatically in the background twice a day, so you rarely nee
 | Method | Path | Action |
 |---|---|---|
 | GET | /status | dashboard data: domain/user/alias counts, service health, disk usage, mail queue size, per-domain certificate expiry |
+| GET | /stats | live CPU and memory usage per container plus host totals (from `docker stats`) |
 | GET | /queue | list queued messages (id, sender, recipients, queue, delay reason) |
 | POST | /queue/flush | retry delivery of the whole queue now |
 | DELETE | /queue/{id} | delete one message; use `ALL` to delete the whole queue |

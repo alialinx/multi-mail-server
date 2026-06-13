@@ -244,6 +244,8 @@ function renderShell() {
 
 function go(view) {
     state.view = view;
+    // stop any live polling (e.g. the dashboard resource refresh) from the old view
+    if (state._statsTimer) { clearInterval(state._statsTimer); state._statsTimer = null; }
     // #content persists across navigation; replace it so delegated click
     // listeners from the previous view do not stack up on the same node.
     const old = $("#content");
@@ -570,50 +572,53 @@ async function viewAliases() {
    ============================================================ */
 async function viewCerts() {
     loading();
-    if (!state.domains.length) {
-        try { state.domains = await api("GET", "/domains"); } catch (e) { return errorState(e); }
-    }
-    const opts = state.domains.map((d) => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join("")
-        || `<option value="">No domains yet</option>`;
+    let s;
+    try { s = await api("GET", "/status"); }
+    catch (e) { return errorState(e); }
+
+    const rows = s.certs.length ? s.certs.map((c) => {
+        let badge;
+        if (!c.valid) badge = '<span class="badge off">missing</span>';
+        else if (c.days_left < 15) badge = `<span class="badge warn-b">${c.days_left}d left</span>`;
+        else badge = `<span class="badge ok">${c.days_left}d left</span>`;
+        return `<tr>
+            <td><strong>${esc(c.domain)}</strong></td>
+            <td>${badge}</td>
+            <td class="muted">${c.valid ? esc(c.expires) : "-"}</td>
+            <td class="actions"><button class="ghost sm" data-act="renew" data-domain="${esc(c.domain)}">${c.valid ? "Renew now" : "Issue"}</button></td>
+        </tr>`;
+    }).join("") : `<tr><td colspan="4" class="empty">No domains yet. Add one under Domains.</td></tr>`;
 
     $("#content").innerHTML = `
         <div class="card">
-            <div class="card-head"><h3>Issue certificate</h3></div>
-            <div class="card-body">
-                <form class="inline-form" id="issue-cert">
-                    <div class="field"><label>Domain</label><select id="c-domain">${opts}</select></div>
-                    <button type="submit" ${state.domains.length ? "" : "disabled"}>Issue</button>
-                </form>
-                <p class="hint" style="margin:10px 0 0">HTTP-01 needs <span class="mono">mail.&lt;domain&gt;</span> to resolve to the server first. Run after DNS propagates.</p>
+            <div class="card-head">
+                <h3>Certificates</h3>
+                <button class="ghost sm" id="renew-all">Renew all</button>
             </div>
+            <table><thead><tr><th>Domain</th><th>Status</th><th>Expires</th><th></th></tr></thead><tbody>${rows}</tbody></table>
         </div>
-        <div class="card">
-            <div class="card-head"><h3>Renew all</h3></div>
-            <div class="card-body">
-                <p class="muted" style="margin:0 0 14px">Certificates renew automatically twice a day. Use this only to force a renewal now. Restarts HAProxy briefly. Expiry dates are on the Dashboard.</p>
-                <button id="renew-all">Renew all certificates</button>
-            </div>
-        </div>`;
-
-    $("#issue-cert").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const domain = $("#c-domain").value;
-        if (!domain) return;
-        const btn = e.submitter; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
-        try {
-            await api("POST", `/certs/issue/${encodeURIComponent(domain)}`);
-            toast(`Certificate issued for ${domain}`);
-        } catch (err) { toast(err.message, "error"); }
-        btn.disabled = false; btn.textContent = "Issue";
-    });
+        <p class="hint">Certificates renew automatically twice a day. "Renew now" re-checks one domain (issues if missing, renews if due). HTTP-01 needs <span class="mono">mail.&lt;domain&gt;</span> to resolve to the server; it restarts HAProxy briefly.</p>`;
 
     $("#renew-all").addEventListener("click", async (e) => {
-        const btn = e.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Renewing…';
+        const btn = e.currentTarget; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+        try { await api("POST", "/certs/renew"); toast("Renewal finished"); viewCerts(); }
+        catch (err) { toast(err.message, "error"); btn.disabled = false; btn.textContent = "Renew all"; }
+    });
+
+    const table = $("#content table");
+    if (table) table.addEventListener("click", async (e) => {
+        const btn = e.target.closest('button[data-act="renew"]');
+        if (!btn) return;
+        const domain = btn.dataset.domain;
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
         try {
-            await api("POST", "/certs/renew");
-            toast("Renewal finished");
-        } catch (err) { toast(err.message, "error"); }
-        btn.disabled = false; btn.textContent = "Renew all certificates";
+            await api("POST", `/certs/issue/${encodeURIComponent(domain)}`);
+            toast(`Certificate updated for ${domain}`);
+            viewCerts();
+        } catch (err) {
+            toast(err.message, "error");
+            btn.disabled = false; btn.textContent = "Renew now";
+        }
     });
 }
 
@@ -626,6 +631,39 @@ function fmtBytes(b) {
     let i = 0, n = b;
     while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
     return `${n.toFixed(1)} ${u[i]}`;
+}
+
+// dependency-free SVG donut gauge (0-100%)
+function donut(percent, label, sub = "") {
+    const p = Math.max(0, Math.min(100, percent || 0));
+    const r = 42, circ = 2 * Math.PI * r;
+    const off = circ * (1 - p / 100);
+    const color = p >= 90 ? "var(--danger)" : p >= 75 ? "var(--warn)" : "var(--accent)";
+    return `<div class="donut">
+        <svg viewBox="0 0 100 100">
+            <circle class="donut-bg" cx="50" cy="50" r="${r}"></circle>
+            <circle class="donut-fg" cx="50" cy="50" r="${r}" stroke="${color}" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"></circle>
+            <text class="donut-num" x="50" y="54" text-anchor="middle">${p.toFixed(0)}%</text>
+        </svg>
+        <div class="donut-label">${esc(label)}</div>
+        ${sub ? `<div class="donut-sub muted">${esc(sub)}</div>` : ""}
+    </div>`;
+}
+
+async function refreshStats() {
+    let st;
+    try { st = await api("GET", "/stats"); }
+    catch { return; }
+    const cpuEl = $("#donut-cpu"), memEl = $("#donut-mem"), listEl = $("#ctr-stats");
+    if (!cpuEl || !memEl || !listEl) return;   // navigated away mid-request
+    cpuEl.innerHTML = donut(st.totals.cpu, "CPU", `${st.cpus} core${st.cpus > 1 ? "s" : ""}`);
+    memEl.innerHTML = donut(st.totals.mem, "Memory", "of host");
+    listEl.innerHTML = st.containers.map((c) => `
+        <div class="ctr">
+            <span class="ctr-name">${esc(c.name)}</span>
+            <div class="ctr-bar"><span class="ctr-tag">CPU</span><div class="bar mini"><div class="bar-fill" style="width:${Math.min(c.cpu, 100)}%"></div></div><span class="ctr-pct">${c.cpu}%</span></div>
+            <div class="ctr-bar"><span class="ctr-tag">MEM</span><div class="bar mini"><div class="bar-fill" style="width:${Math.min(c.mem, 100)}%"></div></div><span class="ctr-pct">${esc(c.mem_usage)}</span></div>
+        </div>`).join("");
 }
 
 async function viewDashboard() {
@@ -644,12 +682,11 @@ async function viewDashboard() {
         let badge;
         if (!c.valid) badge = '<span class="badge off">missing</span>';
         else if (c.days_left != null && c.days_left < 15) badge = `<span class="badge warn-b">${c.days_left}d left</span>`;
-        else badge = '<span class="badge ok">valid</span>';
+        else badge = `<span class="badge ok">${c.days_left}d left</span>`;
         return `<tr><td><strong>${esc(c.domain)}</strong></td><td>${badge}</td><td class="muted">${c.valid ? esc(c.expires) : "-"}</td></tr>`;
     }).join("") : `<tr><td colspan="3" class="empty">No domains yet.</td></tr>`;
 
     const d = s.disk;
-    const diskKind = d.percent >= 90 ? "bad" : d.percent >= 75 ? "warn" : "";
 
     $("#content").innerHTML = `
         <div class="stats">
@@ -658,23 +695,30 @@ async function viewDashboard() {
             ${stat("Aliases", s.aliases)}
             ${stat("Mail queue", s.queue.count, s.queue.count ? "needs attention" : "empty", s.queue.count ? "warn" : "")}
         </div>
+        <div class="card">
+            <div class="card-head"><h3>Resources</h3><span class="muted">live · refreshes every 5s</span></div>
+            <div class="card-body">
+                <div class="donuts">
+                    <div id="donut-cpu">${donut(0, "CPU", "…")}</div>
+                    <div id="donut-mem">${donut(0, "Memory", "…")}</div>
+                    ${donut(d.percent, "Disk", `${fmtBytes(d.used)} / ${fmtBytes(d.total)}`)}
+                </div>
+                <div id="ctr-stats" class="ctr-stats"><div class="empty"><span class="spinner" style="border-color:#ccc;border-top-color:var(--accent)"></span></div></div>
+            </div>
+        </div>
         <div class="grid-2">
             <div class="card">
                 <div class="card-head"><h3>Services</h3></div>
                 <div class="card-body svc-grid">${services}</div>
             </div>
             <div class="card">
-                <div class="card-head"><h3>Disk</h3></div>
-                <div class="card-body">
-                    <div class="bar"><div class="bar-fill ${diskKind}" style="width:${d.percent}%"></div></div>
-                    <p class="muted" style="margin:12px 0 0">${fmtBytes(d.used)} / ${fmtBytes(d.total)} used (${d.percent}%) · ${fmtBytes(d.free)} free</p>
-                </div>
+                <div class="card-head"><h3>Certificates</h3><span class="muted">auto-renewed</span></div>
+                <table><thead><tr><th>Domain</th><th>Status</th><th>Expires</th></tr></thead><tbody>${certRows}</tbody></table>
             </div>
-        </div>
-        <div class="card">
-            <div class="card-head"><h3>Certificates</h3><span class="muted">renewed automatically</span></div>
-            <table><thead><tr><th>Domain</th><th>Status</th><th>Expires</th></tr></thead><tbody>${certRows}</tbody></table>
         </div>`;
+
+    refreshStats();
+    state._statsTimer = setInterval(refreshStats, 5000);
 }
 
 /* ============================================================
@@ -686,7 +730,10 @@ async function viewQueue() {
     try { items = await api("GET", "/queue"); }
     catch (e) { return errorState(e); }
 
-    const rows = items.length ? items.map((m) => `
+    const senderDomain = (m) => ((m.sender || "").split("@")[1] || "—").toLowerCase();
+    const domains = [...new Set(items.map(senderDomain))].sort();
+
+    const renderRows = (list) => list.length ? list.map((m) => `
         <tr>
             <td class="mono">${esc(m.id)}</td>
             <td><span class="badge neutral">${esc(m.queue)}</span></td>
@@ -694,21 +741,30 @@ async function viewQueue() {
             <td class="mono">${esc((m.recipients || []).join(", "))}</td>
             <td class="muted" style="max-width:260px;word-break:break-word">${esc(m.reason || "")}</td>
             <td class="actions"><button class="danger sm" data-act="del" data-id="${esc(m.id)}">Delete</button></td>
-        </tr>`).join("") : `<tr><td colspan="6" class="empty">Queue is empty 🎉</td></tr>`;
+        </tr>`).join("") : `<tr><td colspan="6" class="empty">No messages.</td></tr>`;
 
     $("#content").innerHTML = `
         <div class="card">
             <div class="card-head">
                 <h3>Mail queue</h3>
                 <div class="row-gap">
-                    <span class="muted">${items.length} message(s)</span>
+                    <span class="muted" id="q-count">${items.length} message(s)</span>
+                    ${domains.length > 1 ? `<select id="q-filter" style="width:auto"><option value="">All domains</option>${domains.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join("")}</select>` : ""}
                     <button class="ghost sm" id="q-flush">Flush all</button>
                     ${items.length ? '<button class="danger sm" id="q-delall">Delete all</button>' : ""}
                 </div>
             </div>
-            <table><thead><tr><th>ID</th><th>Queue</th><th>Sender</th><th>Recipients</th><th>Reason</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+            <table><thead><tr><th>ID</th><th>Queue</th><th>Sender</th><th>Recipients</th><th>Reason</th><th></th></tr></thead><tbody id="q-body">${items.length ? renderRows(items) : '<tr><td colspan="6" class="empty">Queue is empty 🎉</td></tr>'}</tbody></table>
         </div>
-        <p class="hint">Flush retries delivery now. Deferred messages are retried automatically by Postfix until they expire.</p>`;
+        <p class="hint">Filter by the sending domain. Flush retries delivery now; deferred messages are retried automatically by Postfix until they expire.</p>`;
+
+    const qFilter = $("#q-filter");
+    if (qFilter) qFilter.addEventListener("change", () => {
+        const dom = qFilter.value;
+        const list = dom ? items.filter((m) => senderDomain(m) === dom) : items;
+        $("#q-body").innerHTML = renderRows(list);
+        $("#q-count").textContent = `${list.length} message(s)`;
+    });
 
     $("#q-flush").addEventListener("click", async (e) => {
         const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spinner"></span>';

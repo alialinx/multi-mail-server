@@ -209,6 +209,11 @@ def status():
     return ok(service.get_status())
 
 
+@api.get("/stats")
+def stats():
+    return ok(service.get_stats())
+
+
 @api.get("/queue")
 def list_queue():
     return ok(service.list_queue())

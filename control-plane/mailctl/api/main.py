@@ -276,7 +276,7 @@ def mailstats(days: int = 30, domain: str = ""):
 
 
 @api.get("/logs")
-def logs(source: str = "postfix", q: str = "", limit: int = 200, noise: bool = False):
+def read_logs(source: str = "postfix", q: str = "", limit: int = 200, noise: bool = False):
     return ok(service.get_logs(source, q, limit, noise))
 
 

@@ -36,6 +36,33 @@ function toast(message, kind = "ok") {
     }, kind === "error" ? 5000 : 3000);
 }
 
+// navigator.clipboard only works over HTTPS or localhost; the panel is usually
+// reached over plain http, so fall back to a hidden textarea + execCommand.
+function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => toast("Copied")).catch(() => fallbackCopy(text));
+        return;
+    }
+    fallbackCopy(text);
+}
+
+function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+        document.execCommand("copy");
+        toast("Copied");
+    } catch (e) {
+        toast("Copy failed, select it manually", "error");
+    }
+    ta.remove();
+}
+
 /* ---------- API layer ---------- */
 async function login(username, password) {
     const res = await fetch(`${API}/token`, {
@@ -368,7 +395,7 @@ function showDnsModal(name, records, certMessage) {
     // so the handler is discarded when the modal closes.
     $(".modal-body").addEventListener("click", (e) => {
         const c = e.target.closest("[data-copy]");
-        if (c) { navigator.clipboard.writeText(c.dataset.copy).then(() => toast("Copied")); }
+        if (c) { copyText(c.dataset.copy); }
     });
 }
 

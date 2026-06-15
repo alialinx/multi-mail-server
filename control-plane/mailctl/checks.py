@@ -4,10 +4,17 @@ import dns.reversename
 from . import dkim
 from .config import MAIL_HOSTNAME, SERVER_IP
 
+# Query public resolvers directly so the check reflects what the world sees,
+# not the server's own (often stale) cache right after a DNS change.
+_public = dns.resolver.Resolver(configure=False)
+_public.nameservers = ["8.8.8.8", "1.1.1.1"]
+_public.timeout = 5
+_public.lifetime = 5
+
 
 def _txt(name):
     try:
-        answers = dns.resolver.resolve(name, "TXT")
+        answers = _public.resolve(name, "TXT")
         return ["".join(part.decode() for part in r.strings) for r in answers]
     except Exception:
         return []
@@ -15,14 +22,14 @@ def _txt(name):
 
 def _a(name):
     try:
-        return [r.address for r in dns.resolver.resolve(name, "A")]
+        return [r.address for r in _public.resolve(name, "A")]
     except Exception:
         return []
 
 
 def _mx(name):
     try:
-        return [str(r.exchange).rstrip(".") for r in dns.resolver.resolve(name, "MX")]
+        return [str(r.exchange).rstrip(".") for r in _public.resolve(name, "MX")]
     except Exception:
         return []
 
@@ -30,7 +37,7 @@ def _mx(name):
 def _ptr(ip):
     try:
         rev = dns.reversename.from_address(ip)
-        return [str(r).rstrip(".") for r in dns.resolver.resolve(rev, "PTR")]
+        return [str(r).rstrip(".") for r in _public.resolve(rev, "PTR")]
     except Exception:
         return []
 

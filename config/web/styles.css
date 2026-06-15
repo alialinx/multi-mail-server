@@ -342,6 +342,7 @@ td.actions button { margin-left: 6px; }
 }
 
 .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: -2px; }
+.ghost .spinner { border-color: rgba(0,0,0,.18); border-top-color: var(--accent); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 720px) {

@@ -920,20 +920,18 @@ async function viewLogs() {
                     <input id="l-q" placeholder="search: email, message-id…" value="${esc(q)}" style="width:220px">
                     <button class="ghost sm" id="l-go">Search</button>
                     <label class="row-gap" style="gap:5px;font-weight:500;cursor:pointer"><input type="checkbox" id="l-live" style="width:auto"> Live</label>
-                    <label class="row-gap" style="gap:5px;font-weight:500;cursor:pointer"><input type="checkbox" id="l-noise" style="width:auto"> Show health checks</label>
                 </div>
             </div>
             <div class="card-body"><pre class="logbox" id="l-out"><span class="muted">Loading…</span></pre></div>
         </div>
-        <p class="hint">Last 300 lines (or matches when you search). <b>Live</b> streams new lines in real time over a socket. HAProxy health-check chatter is hidden by default. Tip: paste a recipient or message-id to trace one mail.</p>`;
+        <p class="hint">Last 300 lines (or matches when you search). <b>Live</b> streams new lines in real time over a socket. Tip: paste a recipient or message-id to trace one mail.</p>`;
 
     const load = async (quiet) => {
         const out = $("#l-out");
         if (!out) return;
         if (!quiet) out.innerHTML = '<span class="muted">Loading…</span>';
-        const noise = $("#l-noise").checked ? "&noise=1" : "";
         try {
-            const r = await api("GET", `/logs?source=${encodeURIComponent($("#l-source").value)}&q=${encodeURIComponent($("#l-q").value.trim())}&limit=300${noise}`);
+            const r = await api("GET", `/logs?source=${encodeURIComponent($("#l-source").value)}&q=${encodeURIComponent($("#l-q").value.trim())}&limit=300&noise=1`);
             const atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
             out.textContent = r.lines.length ? r.lines.join("\n") : "No matching log lines.";
             if (atBottom || !quiet) out.scrollTop = out.scrollHeight;
@@ -942,7 +940,6 @@ async function viewLogs() {
 
     const relive = () => { if ($("#l-live").checked) { closeLogWs(); openLogWs(); } else { load(); } };
     $("#l-source").addEventListener("change", () => { state._logSource = $("#l-source").value; relive(); });
-    $("#l-noise").addEventListener("change", relive);
     $("#l-go").addEventListener("click", () => { $("#l-live").checked = false; closeLogWs(); state._logQuery = $("#l-q").value.trim(); load(); });
     $("#l-q").addEventListener("keydown", (e) => { if (e.key === "Enter") { $("#l-go").click(); } });
     $("#l-live").addEventListener("change", (e) => { closeLogWs(); if (e.target.checked) openLogWs(); else load(); });
@@ -954,8 +951,7 @@ function openLogWs() {
     if (!out) return;
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const src = encodeURIComponent($("#l-source").value);
-    const noise = $("#l-noise").checked ? "1" : "0";
-    const ws = new WebSocket(`${proto}//${location.host}/api/ws/logs?source=${src}&noise=${noise}&token=${encodeURIComponent(getToken())}`);
+    const ws = new WebSocket(`${proto}//${location.host}/api/ws/logs?source=${src}&noise=1&token=${encodeURIComponent(getToken())}`);
     state._logWs = ws;
     out.textContent = "";
     ws.onmessage = (ev) => {

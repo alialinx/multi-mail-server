@@ -403,6 +403,7 @@ async function showCheckModal(name) {
     openModal({ title: `Deliverability check — ${name}`, html: `<div class="empty"><span class="spinner" style="border-color:#ccc;border-top-color:var(--accent)"></span> Looking up live DNS…</div>` });
     try {
         const items = await api("GET", `/domains/${encodeURIComponent(name)}/check`);
+        updateDomainBadge(name, items);
         const html = items.map((it) => {
             const cls = it.ok === true ? "ok" : it.ok === false ? "bad" : "unk";
             return `<div class="check-item"><span class="dot ${cls}"></span><span class="c-name">${esc(it.check)}</span><span class="c-detail">${esc(it.detail)}</span></div>`;
@@ -1005,18 +1006,27 @@ async function viewSecurity() {
 }
 
 /* ---------- domain deliverability badges (lazy) ---------- */
+function domainBadgeHtml(name, items) {
+    const checkable = items.filter((i) => i.ok !== null);
+    const total = checkable.length;
+    const okCount = checkable.filter((i) => i.ok === true).length;
+    const cls = okCount === total && total > 0 ? "ok" : okCount >= total - 1 ? "warn-b" : "off";
+    const tip = items.map((i) => `${i.check}: ${i.ok === true ? "ok" : i.ok === false ? "fail" : "?"}`).join(" · ");
+    return `<span class="badge ${cls} dchip" data-act="check" data-name="${esc(name)}" title="Click for details — ${esc(tip)}">${okCount}/${total} checks ✓</span>`;
+}
+
+function updateDomainBadge(name, items) {
+    const cell = document.querySelector(`.dcheck[data-domain="${name}"]`);
+    if (cell) cell.innerHTML = domainBadgeHtml(name, items);
+}
+
 function loadDomainBadges() {
     document.querySelectorAll(".dcheck").forEach(async (cell) => {
         const name = cell.dataset.domain;
         cell.innerHTML = '<span class="spinner" style="border-color:#ddd;border-top-color:var(--accent);width:12px;height:12px"></span>';
         try {
             const items = await api("GET", `/domains/${encodeURIComponent(name)}/check`);
-            const checkable = items.filter((i) => i.ok !== null);
-            const total = checkable.length;
-            const okCount = checkable.filter((i) => i.ok === true).length;
-            const cls = okCount === total && total > 0 ? "ok" : okCount >= total - 1 ? "warn-b" : "off";
-            const tip = items.map((i) => `${i.check}: ${i.ok === true ? "ok" : i.ok === false ? "fail" : "?"}`).join(" · ");
-            cell.innerHTML = `<span class="badge ${cls} dchip" data-act="check" data-name="${esc(name)}" title="Click for details — ${esc(tip)}">${okCount}/${total} checks ✓</span>`;
+            cell.innerHTML = domainBadgeHtml(name, items);
         } catch {
             cell.innerHTML = '<span class="muted">—</span>';
         }

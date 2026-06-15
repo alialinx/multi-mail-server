@@ -20,5 +20,5 @@ def usage():
         used_kb = int(value) if value.isdigit() else 0
         limit_kb = int(limit) if limit.isdigit() else 0
         percent = round(used_kb / limit_kb * 100, 1) if limit_kb > 0 else 0
-        out[email] = {"used_mb": round(used_kb / 1024, 1), "percent": percent}
+        out[email] = {"used_mb": round(used_kb / 1024, 1), "used_kb": used_kb, "percent": percent}
     return out

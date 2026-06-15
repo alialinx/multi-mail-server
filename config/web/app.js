@@ -434,14 +434,17 @@ async function viewUsers() {
         state.domains.map((d) => `<option value="${esc(d.name)}" ${d.name === filter ? "selected" : ""}>${esc(d.name)}</option>`).join("");
 
     const usageCell = (u) => {
-        const used = usage[u.email] ? usage[u.email].used_mb : null;
+        const info = usage[u.email];
+        // small mailboxes are KBs; show MB only once it is at least 1 MB
+        const label = info ? (info.used_mb >= 1 ? `${info.used_mb} MB` : `${info.used_kb || 0} KB`) : null;
         if (!u.quota_mb) {
-            return used != null ? `${used} MB <span class="muted">/ ∞</span>` : '<span class="muted">unlimited</span>';
+            return label != null ? `${label} <span class="muted">/ ∞</span>` : '<span class="muted">unlimited</span>';
         }
-        const pct = used != null ? Math.min(Math.round(used / u.quota_mb * 100), 100) : 0;
+        const usedMb = info ? info.used_mb : 0;
+        const pct = info ? Math.min(Math.round(usedMb / u.quota_mb * 100), 100) : 0;
         const kind = pct >= 90 ? "bad" : pct >= 75 ? "warn" : "";
         return `<div class="bar mini" style="margin-bottom:3px"><div class="bar-fill ${kind}" style="width:${pct}%"></div></div>
-            <span class="muted" style="font-size:12px">${used != null ? used : "?"} / ${u.quota_mb} MB</span>`;
+            <span class="muted" style="font-size:12px">${label != null ? label : "?"} / ${u.quota_mb} MB</span>`;
     };
 
     const rows = users.length ? users.map((u) => `

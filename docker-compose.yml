@@ -70,12 +70,26 @@ services:
       - "127.0.0.1:2525:2525"
       - "127.0.0.1:2465:2465"
       - "127.0.0.1:2587:2587"
+    dns:
+      - 10.123.0.53
+      - 8.8.8.8
     networks:
       - mailnet
     depends_on:
       - postgres
       - dovecot
       - opendkim
+      - unbound
+
+  unbound:
+    build: ./images/unbound
+    container_name: unbound
+    restart: unless-stopped
+    volumes:
+      - ./config/unbound/unbound.conf:/etc/unbound/unbound.conf:ro
+    networks:
+      mailnet:
+        ipv4_address: 10.123.0.53
 
   haproxy:
     image: haproxy:lts

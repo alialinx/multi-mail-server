@@ -26,6 +26,7 @@ Each part runs in its own container. They are wired with one Docker network call
 | acme-web | A tiny nginx that serves Let's Encrypt HTTP challenges |
 | certbot | Gets and renews all certificates |
 | fail2ban | Bans IPs that brute-force SMTP or IMAP login |
+| unbound | A small local DNS resolver for Postfix. Postscreen asks Spamhaus and SpamCop through it, because Spamhaus does not answer queries from big public resolvers like 8.8.8.8. If it is down, Postfix falls back to 8.8.8.8 and mail keeps flowing, only without Spamhaus |
 | api | The REST API, the reconcile logic, and the bootstrap step. This is the control plane |
 | web | A static admin panel (nginx) that calls the API. Serves the UI and reverse-proxies `/api/` to the api container |
 

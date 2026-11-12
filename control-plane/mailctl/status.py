@@ -10,7 +10,7 @@ from .db import Alias, Domain, SessionLocal, User
 
 EXPECTED_SERVICES = [
     "postgres", "postfix", "dovecot", "opendkim", "haproxy",
-    "traefik", "acme-web", "certbot", "fail2ban", "api", "web",
+    "traefik", "acme-web", "certbot", "fail2ban", "api", "web", "unbound",
 ]
 
 

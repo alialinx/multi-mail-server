@@ -87,6 +87,11 @@ Fail2ban runs on the host network with `NET_ADMIN` and `NET_RAW` so it can add f
 - Status: **accepted**. It uses `iptables-allports`, so a banned IP is blocked on every host port, SSH too. Ports that Docker publishes (80, 443, and 3000/8080 if open) skip these rules, so a banned user can still open the panel. This looks like "mail and SSH are down but the web works". On some hosts its rules can interact with Docker's own iptables rules, so verify bans work after install.
 - Also do: add your own IPs, your VPN and your app servers to `ignoreip` in `config/fail2ban/jail.local`, for example `ignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.8.0.0/24`, then run `docker restart fail2ban`. The Postfix jail runs in `aggressive` mode, so a mail client with a wrong setting, or a test that drops the connection after STARTTLS, can ban you within minutes. To unban, use the panel or `DELETE /fail2ban/banned/{ip}`.
 
+### A hacked mailbox can send spam from the server IP
+If someone guesses or steals a mailbox password, they can send mail through the server and get its IP blocked.
+- Status: **mitigated**. Fail2ban bans password guessing, and the `ratelimit` service caps each account at 250 recipients per hour (2000 for `noreply@` app accounts). Watch `docker logs ratelimit` for `LIMIT` lines; a normal user should never hit it.
+- Note: an app that submits mail and gets `450` should retry later. Check that your apps do, or raise their limit.
+
 ### Spamhaus free use has limits
 Postscreen checks every incoming connection against Spamhaus zen and SpamCop through the local `unbound` resolver.
 - Status: **accepted**. Spamhaus is free only for low volume, non-commercial use (roughly under 100k SMTP connections a day). If you host mail commercially or above that, get a Spamhaus Data Query Service (DQS) key and switch `postscreen_dnsbl_sites` to the DQS zone.

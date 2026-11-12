@@ -80,6 +80,17 @@ services:
       - dovecot
       - opendkim
       - unbound
+      - ratelimit
+
+  ratelimit:
+    build: ./images/ratelimit
+    container_name: ratelimit
+    restart: unless-stopped
+    environment:
+      RATE_LIMIT_PER_HOUR: ${RATE_LIMIT_PER_HOUR:-250}
+      RATE_LIMIT_NOREPLY_PER_HOUR: ${RATE_LIMIT_NOREPLY_PER_HOUR:-2000}
+    networks:
+      - mailnet
 
   unbound:
     build: ./images/unbound

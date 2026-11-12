@@ -66,6 +66,9 @@ smtpd_delay_reject = yes
 anvil_rate_time_unit = 60s
 smtpd_client_connection_rate_limit = 30
 
+smtpd_end_of_data_restrictions =
+    check_policy_service { inet:ratelimit:10040, default_action=DUNNO }
+
 postscreen_upstream_proxy_protocol = haproxy
 postscreen_greet_action = enforce
 postscreen_dnsbl_action = enforce

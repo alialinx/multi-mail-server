@@ -26,6 +26,7 @@ Each part runs in its own container. They are wired with one Docker network call
 | acme-web | A tiny nginx that serves Let's Encrypt HTTP challenges |
 | certbot | Gets and renews all certificates |
 | fail2ban | Bans IPs that brute-force SMTP or IMAP login |
+| ratelimit | A small Postfix policy service that limits how many recipients each logged-in account can send to per hour |
 | unbound | A small local DNS resolver for Postfix. Postscreen asks Spamhaus and SpamCop through it, because Spamhaus does not answer queries from big public resolvers like 8.8.8.8. If it is down, Postfix falls back to 8.8.8.8 and mail keeps flowing, only without Spamhaus |
 | api | The REST API, the reconcile logic, and the bootstrap step. This is the control plane |
 | web | A static admin panel (nginx) that calls the API. Serves the UI and reverse-proxies `/api/` to the api container |
@@ -76,6 +77,12 @@ Fail2ban reads the Postfix and Dovecot log files from the shared `maillog` volum
 ## Mail queue
 
 Mail that cannot be delivered stays in the Postfix queue and is retried: first after 5 minutes, then with longer gaps up to about an hour. After 2 days (`maximal_queue_lifetime`) Postfix gives up and sends a bounce to the sender. Bounces themselves are retried for 1 day (`bounce_queue_lifetime`). The Postfix default is 5 days for both. It is shorter here because most mail is app notifications, and retrying the same dead or full mailbox for days hurts sender reputation.
+
+## Sending limits
+
+Each logged-in (SASL) account may send to a limited number of recipients per rolling hour: 250 by default, 2000 for addresses that start with `noreply@`. Set them with `RATE_LIMIT_PER_HOUR` and `RATE_LIMIT_NOREPLY_PER_HOUR` in `.env`. This stops a hacked password from sending thousands of spam mails and ruining the server IP.
+
+Postfix asks the `ratelimit` container at the end of every message. Over the limit, the message gets `450 4.7.1 Sending limit reached`, a temporary error, so a normal mail client tries again later. Mail coming in from other servers is not counted. Counts are kept in memory, so they reset when the container restarts. If the container is down, Postfix sends mail without limits instead of stopping. Limit hits show in `docker logs ratelimit` as `LIMIT <account>` lines.
 
 ## Reloads and the Docker socket
 

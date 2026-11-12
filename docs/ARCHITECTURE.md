@@ -73,6 +73,10 @@ Inbound spam is reduced at SMTP time by postscreen and the DNS blocklists (Spamh
 
 Fail2ban reads the Postfix and Dovecot log files from the shared `maillog` volume and bans IPs that fail login too many times. It runs on the host network with `NET_ADMIN` so it can add firewall rules for the public mail ports. Because HAProxy forwards the real client IP with the PROXY protocol, the logs show the real IP and the bans are correct.
 
+## Mail queue
+
+Mail that cannot be delivered stays in the Postfix queue and is retried: first after 5 minutes, then with longer gaps up to about an hour. After 2 days (`maximal_queue_lifetime`) Postfix gives up and sends a bounce to the sender. Bounces themselves are retried for 1 day (`bounce_queue_lifetime`). The Postfix default is 5 days for both. It is shorter here because most mail is app notifications, and retrying the same dead or full mailbox for days hurts sender reputation.
+
 ## Reloads and the Docker socket
 
 The API reloads other containers by running `docker exec` and `docker restart`. For this it mounts the host Docker socket. Keep the host secure, because access to the Docker socket is root-level access.

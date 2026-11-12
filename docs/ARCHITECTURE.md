@@ -82,7 +82,11 @@ Mail that cannot be delivered stays in the Postfix queue and is retried: first a
 
 Each logged-in (SASL) account may send to a limited number of recipients per rolling hour: 250 by default, 2000 for addresses that start with `noreply@`. Set them with `RATE_LIMIT_PER_HOUR` and `RATE_LIMIT_NOREPLY_PER_HOUR` in `.env`. This stops a hacked password from sending thousands of spam mails and ruining the server IP.
 
-Postfix asks the `ratelimit` container at the end of every message. Over the limit, the message gets `450 4.7.1 Sending limit reached`, a temporary error, so a normal mail client tries again later. Mail coming in from other servers is not counted. Counts are kept in memory, so they reset when the container restarts. If the container is down, Postfix sends mail without limits instead of stopping. Limit hits show in `docker logs ratelimit` as `LIMIT <account>` lines.
+Postfix asks the `ratelimit` container at the end of every message. Over the limit, the message gets `450 4.7.1 Sending limit reached`, a temporary error, so a normal mail client tries again later. Mail coming in from other servers is not counted. If the container is down, Postfix sends mail without limits instead of stopping. Limit hits show in `docker logs ratelimit` as `LIMIT <account>` lines.
+
+The **Sending** page in the panel shows each account's numbers and lets you set a custom limit per account. Custom limits are stored in the `send_limits` table. The API writes them to `/gen-config/ratelimit/limits.json`, and the ratelimit service reads that file again whenever it changes, so no restart is needed.
+
+The ratelimit service keeps hourly counts for 7 days and saves them every minute to the `ratelimit-data` volume, so a restart keeps the history. It serves the numbers on port 10041 (`GET /usage`), only inside the Docker network. The **Messages** button reads the Postfix log to list what an account sent recently.
 
 ## Reloads and the Docker socket
 

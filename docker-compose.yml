@@ -89,6 +89,9 @@ services:
     environment:
       RATE_LIMIT_PER_HOUR: ${RATE_LIMIT_PER_HOUR:-250}
       RATE_LIMIT_NOREPLY_PER_HOUR: ${RATE_LIMIT_NOREPLY_PER_HOUR:-2000}
+    volumes:
+      - gen-config:/gen-config:ro
+      - ratelimit-data:/data
     networks:
       - mailnet
 
@@ -187,6 +190,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       PANEL_ALLOW_IPS: ${PANEL_ALLOW_IPS:-}
+      RATE_LIMIT_PER_HOUR: ${RATE_LIMIT_PER_HOUR:-250}
+      RATE_LIMIT_NOREPLY_PER_HOUR: ${RATE_LIMIT_NOREPLY_PER_HOUR:-2000}
     ports:
       - "${ADMIN_BIND:-0.0.0.0}:${API_PORT}:8080"
     volumes:
@@ -232,3 +237,4 @@ volumes:
   dkim-keys:
   gen-config:
   acme-webroot:
+  ratelimit-data:

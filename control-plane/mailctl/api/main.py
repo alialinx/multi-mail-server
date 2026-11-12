@@ -45,6 +45,10 @@ def start_background():
         init_db()   # ensure newer tables (e.g. mail_stats) exist on upgrades
     except Exception:
         pass
+    try:
+        service.sending.write_limits_file()
+    except Exception:
+        pass
     threading.Thread(target=_renew_loop, daemon=True).start()
     threading.Thread(target=_mailstats_loop, daemon=True).start()
 
@@ -139,6 +143,10 @@ class AutoreplyIn(BaseModel):
     active: bool
     subject: str = ""
     text: str = ""
+
+
+class SendLimitIn(BaseModel):
+    per_hour: int | None = None
 
 
 class AliasIn(BaseModel):
@@ -253,6 +261,21 @@ def remove_alias(address: str, goto: str = None):
 @api.post("/certs/issue/{domain}")
 def issue_cert(domain: str):
     return ok(service.issue_cert(domain))
+
+
+@api.get("/sending")
+def sending_overview():
+    return ok(service.sending_overview())
+
+
+@api.put("/sending/{address}")
+def set_send_limit(address: str, body: SendLimitIn):
+    return ok(service.set_send_limit(address, body.per_hour))
+
+
+@api.get("/sending/{address}/messages")
+def sent_messages(address: str, limit: int = 50):
+    return ok(service.sent_messages(address, limit))
 
 
 @api.post("/certs/panel")

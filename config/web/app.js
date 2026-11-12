@@ -240,6 +240,7 @@ const NAV = [
     { key: "users", label: "Users", ico: "👤" },
     { key: "aliases", label: "Aliases", ico: "↪" },
     { key: "queue", label: "Mail queue", ico: "📬" },
+    { key: "sending", label: "Sending", ico: "📤" },
     { key: "certs", label: "Certificates", ico: "🔒" },
     { key: "logs", label: "Logs", ico: "📜" },
     { key: "security", label: "Security", ico: "🛡️" },
@@ -274,7 +275,7 @@ function renderShell() {
 function go(view) {
     state.view = view;
     // stop any live polling / sockets from the old view
-    ["_statsTimer", "_logTimer"].forEach((k) => { if (state[k]) { clearInterval(state[k]); state[k] = null; } });
+    ["_statsTimer", "_logTimer", "_sendTimer"].forEach((k) => { if (state[k]) { clearInterval(state[k]); state[k] = null; } });
     if (state._logWs) { try { state._logWs.close(); } catch (e) {} state._logWs = null; }
     // #content persists across navigation; replace it so delegated click
     // listeners from the previous view do not stack up on the same node.
@@ -283,7 +284,7 @@ function go(view) {
     document.querySelectorAll(".nav a[data-view]").forEach((a) => a.classList.toggle("active", a.dataset.view === view));
     $("#page-title").textContent = NAV.find((n) => n.key === view).label;
     $("#topbar-actions").innerHTML = "";
-    const views = { dashboard: viewDashboard, domains: viewDomains, users: viewUsers, aliases: viewAliases, queue: viewQueue, certs: viewCerts, logs: viewLogs, security: viewSecurity };
+    const views = { dashboard: viewDashboard, domains: viewDomains, users: viewUsers, aliases: viewAliases, queue: viewQueue, sending: viewSending, certs: viewCerts, logs: viewLogs, security: viewSecurity };
     views[view]();
 }
 
@@ -900,6 +901,148 @@ async function viewQueue() {
             await api("DELETE", `/queue/${encodeURIComponent(btn.dataset.id)}`); toast("Message deleted"); viewQueue();
         }, { confirmLabel: "Delete", danger: true });
     });
+}
+
+/* ============================================================
+   Sending
+   ============================================================ */
+function fmtAgo(ts) {
+    if (!ts) return '<span class="muted">never</span>';
+    const sec = Math.max(0, Math.round(Date.now() / 1000 - ts));
+    if (sec < 60) return `${sec}s ago`;
+    if (sec < 3600) return `${Math.round(sec / 60)} min ago`;
+    if (sec < 86400) return `${Math.round(sec / 3600)} h ago`;
+    return `${Math.round(sec / 86400)} d ago`;
+}
+
+async function viewSending() {
+    const first = !$("#s-table");
+    if (first) loading();
+    let data;
+    try { data = await api("GET", "/sending"); }
+    catch (e) { return errorState(e); }
+    if (state.view !== "sending") return;
+
+    const q = (state._sendFilter || "").toLowerCase();
+    const onlyActive = state._sendActive !== false;
+    const list = data.accounts.filter((a) =>
+        (!q || a.address.includes(q)) && (!onlyActive || a.last_7d > 0 || a.custom || a.deferred_24h > 0));
+
+    const totalHour = data.accounts.reduce((n, a) => n + a.last_hour, 0);
+    const total24 = data.accounts.reduce((n, a) => n + a.last_24h, 0);
+    const held24 = data.accounts.reduce((n, a) => n + a.deferred_24h, 0);
+    const limitedNow = data.accounts.filter((a) => a.limited_now).length;
+    const stat = (label, value, sub = "", kind = "") =>
+        `<div class="stat ${kind}"><div class="stat-val">${value}</div><div class="stat-label">${esc(label)}</div>${sub ? `<div class="stat-sub">${esc(sub)}</div>` : ""}</div>`;
+
+    const usageCell = (a) => {
+        const pct = Math.min(a.percent, 100);
+        const kind = pct >= 90 ? "bad" : pct >= 70 ? "warn" : "";
+        return `<div class="bar mini" style="margin-bottom:3px"><div class="bar-fill ${kind}" style="width:${pct}%"></div></div>
+            <span class="muted" style="font-size:12px">${a.last_hour} / ${a.limit} (${a.percent}%)</span>`;
+    };
+
+    const rows = list.length ? list.map((a) => `
+        <tr>
+            <td><strong>${esc(a.address)}</strong>${a.mailbox ? "" : ' <span class="badge neutral">no mailbox</span>'}
+                ${a.limited_now ? '<div><span class="badge off">limit reached</span></div>' : ""}</td>
+            <td style="min-width:150px">${usageCell(a)}</td>
+            <td>${a.last_24h}</td>
+            <td>${a.last_7d}</td>
+            <td>${a.deferred_24h ? `<span class="badge warn-b">${a.deferred_24h}</span>` : '<span class="muted">0</span>'}</td>
+            <td><span title="${esc(a.last_client || "")}">${fmtAgo(a.last_sent_at)}</span></td>
+            <td>${a.limit}/h ${a.custom ? '<span class="badge ok">custom</span>' : '<span class="badge neutral">default</span>'}</td>
+            <td class="actions">
+                <button class="ghost sm" data-act="messages" data-address="${esc(a.address)}">Messages</button>
+                <button class="ghost sm" data-act="limit" data-address="${esc(a.address)}" data-limit="${a.custom ? a.limit : ""}">Set limit</button>
+                ${a.custom ? `<button class="ghost sm" data-act="reset" data-address="${esc(a.address)}">Reset</button>` : ""}
+            </td>
+        </tr>`).join("") : `<tr><td colspan="8" class="empty">${q || onlyActive ? "No matching accounts." : "No accounts."}</td></tr>`;
+
+    const warn = data.available ? "" :
+        '<div class="card"><div class="card-body"><p class="muted" style="margin:0">The ratelimit service is not reachable, so live numbers are missing. Limits you set are still saved.</p></div></div>';
+
+    if (first) {
+        $("#content").innerHTML = `
+            ${warn}
+            <div class="stats" id="s-stats"></div>
+            <div class="card">
+                <div class="card-head">
+                    <h3>Accounts</h3>
+                    <div class="row-gap">
+                        <input id="s-q" placeholder="filter: email or domain" value="${esc(state._sendFilter || "")}" style="width:200px">
+                        <label class="row-gap" style="gap:5px;font-weight:500;cursor:pointer"><input type="checkbox" id="s-active" style="width:auto" ${onlyActive ? "checked" : ""}> Only active</label>
+                        <button class="ghost sm" id="s-refresh">Refresh</button>
+                    </div>
+                </div>
+                <table id="s-table"><thead><tr><th>Account</th><th>Last hour</th><th>24 h</th><th>7 days</th><th>Held back 24 h</th><th>Last sent</th><th>Limit</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
+            <p class="hint">Numbers count recipients, sent by logged-in accounts through 465/587. Default limit is ${data.default_limit} per hour, ${data.noreply_limit} for <code>noreply@</code> accounts. Over the limit, mail is held back with a temporary error and the client retries later. An account that hits its limit and is not an app is a sign of a stolen password. Updates every 30 seconds.</p>`;
+
+        $("#s-q").addEventListener("input", (e) => { state._sendFilter = e.target.value.trim(); viewSending(); });
+        $("#s-active").addEventListener("change", (e) => { state._sendActive = e.target.checked; viewSending(); });
+        $("#s-refresh").addEventListener("click", () => viewSending());
+        $("#content").addEventListener("click", onSendingAction);
+        state._sendTimer = setInterval(() => { if (!document.querySelector("#modal-root .modal")) viewSending(); }, 30000);
+    }
+
+    $("#s-stats").innerHTML = `
+        ${stat("Sent last hour", totalHour)}
+        ${stat("Sent last 24 h", total24)}
+        ${stat("Held back 24 h", held24, held24 ? "over the limit" : "", held24 ? "warn" : "")}
+        ${stat("At limit now", limitedNow, limitedNow ? "check these accounts" : "none", limitedNow ? "warn" : "")}`;
+    $("#s-table tbody").innerHTML = rows;
+}
+
+async function onSendingAction(e) {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const address = btn.dataset.address;
+    const act = btn.dataset.act;
+
+    if (act === "limit") {
+        openModal({
+            title: `Sending limit — ${address}`,
+            fields: [{ name: "per_hour", label: "Recipients per hour", type: "number", value: btn.dataset.limit, placeholder: "default", hint: "Leave empty to use the default limit." }],
+            confirmLabel: "Save",
+            onConfirm: async (v) => {
+                const raw = String(v.per_hour ?? "").trim();
+                const per_hour = raw === "" ? null : parseInt(raw, 10);
+                if (per_hour !== null && (!Number.isFinite(per_hour) || per_hour < 1)) throw new Error("Enter a number above 0, or leave empty");
+                await api("PUT", `/sending/${encodeURIComponent(address)}`, { per_hour });
+                toast(per_hour === null ? "Limit reset to default" : `Limit set to ${per_hour}/hour`); viewSending();
+            },
+        });
+    } else if (act === "reset") {
+        confirmAction(`Reset ${address} to the default limit?`, async () => {
+            await api("PUT", `/sending/${encodeURIComponent(address)}`, { per_hour: null });
+            toast("Limit reset to default"); viewSending();
+        }, { confirmLabel: "Reset" });
+    } else if (act === "messages") {
+        showSentMessages(address);
+    }
+}
+
+async function showSentMessages(address) {
+    openModal({ title: `Recent mail — ${address}`, html: '<div id="sm-body"><span class="spinner" style="border-color:#ccc;border-top-color:var(--accent)"></span></div>', wide: true });
+    let items;
+    try { items = await api("GET", `/sending/${encodeURIComponent(address)}/messages?limit=50`); }
+    catch (err) { const b = $("#sm-body"); if (b) b.textContent = err.message; return; }
+    const body = $("#sm-body");
+    if (!body) return;
+    const statusBadgeFor = (st) => st === "sent" ? '<span class="badge ok">sent</span>'
+        : st === "bounced" ? '<span class="badge off">bounced</span>'
+        : `<span class="badge warn-b">${esc(st)}</span>`;
+    const rows = items.map((m) => {
+        const rcpts = m.recipients.length ? m.recipients.map((r) =>
+            `<div class="mono" style="font-size:12px" title="${esc(r.detail)}">${statusBadgeFor(r.status)} ${esc(r.to)}</div>`).join("")
+            : '<span class="muted">not delivered yet / held back</span>';
+        return `<tr><td class="mono" style="white-space:nowrap">${esc(m.time)}</td><td class="mono">${esc(m.queue_id)}</td><td>${rcpts}</td><td class="muted" style="font-size:12px">${esc(m.client)}</td></tr>`;
+    }).join("");
+    body.innerHTML = items.length
+        ? `<table><thead><tr><th>Time</th><th>Queue ID</th><th>Recipients</th><th>Client</th></tr></thead><tbody>${rows}</tbody></table>
+           <p class="hint">Last ${items.length} messages from the mail log, newest first. Hover a recipient to see the server reply. Message subjects are not logged.</p>`
+        : '<p class="muted" style="margin:0">No sent mail found in the log for this account.</p>';
 }
 
 /* ============================================================

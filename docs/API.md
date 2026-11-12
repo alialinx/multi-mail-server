@@ -83,6 +83,14 @@ Renewal also runs automatically in the background twice a day, so you rarely nee
 | POST | /queue/flush | retry delivery of the whole queue now |
 | DELETE | /queue/{id} | delete one message; use `ALL` to delete the whole queue |
 
+### Sending limits
+
+| Method | Path | Body | Action |
+|---|---|---|---|
+| GET | /sending | - | per account: recipients sent in the last hour, 24 hours and 7 days, limit, percent used, held back in 24 hours, last sent time |
+| PUT | /sending/{email} | `{ "per_hour": 500 }` | set a custom hourly limit; `{ "per_hour": null }` goes back to the default |
+| GET | /sending/{email}/messages?limit=50 | - | last messages the account sent, with each recipient and its delivery status, from the mail log |
+
 ### Logs and security
 
 | Method | Path | Action |

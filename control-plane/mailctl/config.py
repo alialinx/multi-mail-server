@@ -6,6 +6,8 @@ SERVER_IP = os.environ.get("SERVER_IP", "127.0.0.1")
 MAIL_HOSTNAME = re.sub(r"[^a-zA-Z0-9.-]", "", os.environ.get("MAIL_HOSTNAME", "localhost"))
 ACME_EMAIL = os.environ.get("ACME_EMAIL", "")
 ACME_SERVER = os.environ.get("ACME_SERVER", "https://acme-v02.api.letsencrypt.org/directory")
+RATE_LIMIT_PER_HOUR = int(os.environ.get("RATE_LIMIT_PER_HOUR", "250"))
+RATE_LIMIT_NOREPLY_PER_HOUR = int(os.environ.get("RATE_LIMIT_NOREPLY_PER_HOUR", "2000"))
 PANEL_ALLOW_IPS = [ip.strip() for ip in os.environ.get("PANEL_ALLOW_IPS", "").split(",") if ip.strip()]
 
 GEN_CONFIG_DIR = "/gen-config"

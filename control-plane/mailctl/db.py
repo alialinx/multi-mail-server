@@ -49,6 +49,15 @@ class Alias(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class SendLimit(Base):
+    __tablename__ = "send_limits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    address: Mapped[str] = mapped_column(String(255), unique=True)
+    per_hour: Mapped[int] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class MailStat(Base):
     __tablename__ = "mail_stats"
 

@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from . import (
     bans, certs, checks, dkim, dns, logs, mailqueue, mailstats,
-    reconcile, sieve, stats, status, usage, validators,
+    reconcile, sending, sieve, stats, status, usage, validators,
 )
 from .config import MAIL_HOSTNAME
 from .db import Alias, Domain, SessionLocal, User, init_db
@@ -27,6 +27,7 @@ def initialize():
     init_db()
     reconcile.ensure_default_cert()
     reconcile.reconcile_all(reload=False)
+    sending.write_limits_file()
 
 
 def list_domains():
@@ -305,6 +306,32 @@ def issue_panel_cert():
     certs.issue_host(MAIL_HOSTNAME)
     reconcile.reconcile_all()
     return {"hostname": MAIL_HOSTNAME, "issued": True, "panel_enabled": reconcile.panel_host() is not None}
+
+
+def sending_overview():
+    return sending.overview()
+
+
+def set_send_limit(address, per_hour):
+    address = (address or "").strip().lower()
+    if not validators.valid_email(address):
+        raise ServiceError(f"invalid email: {address}")
+    if per_hour is not None and not 1 <= per_hour <= sending.MAX_LIMIT:
+        raise ServiceError(f"limit must be between 1 and {sending.MAX_LIMIT}, or empty for the default")
+    sending.set_limit(address, per_hour)
+    limit = per_hour if per_hour is not None else sending.default_limit(address)
+    return {"address": address, "limit": limit, "custom": per_hour is not None}
+
+
+def sent_messages(address, limit=50):
+    address = (address or "").strip().lower()
+    if not validators.valid_email(address):
+        raise ServiceError(f"invalid email: {address}")
+    try:
+        limit = max(1, min(int(limit), 200))
+    except (TypeError, ValueError):
+        limit = 50
+    return sending.recent_messages(address, limit)
 
 
 def renew_certs():

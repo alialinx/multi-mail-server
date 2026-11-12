@@ -99,7 +99,9 @@ Renewal also runs automatically in the background twice a day, so you rarely nee
 - MX record: the domain points to `mail.<domain>`
 - SPF, DKIM, DMARC TXT records exist and the DKIM key matches
 - PTR: the server IP has reverse DNS that forward-confirms
-- Spamhaus: the server IP is not on the zen blocklist
+- Blocklists: the server IP is not on Spamhaus (zen), Barracuda or SpamCop
+
+All lookups go to public DNS (8.8.8.8 and 1.1.1.1), not the server's own cache, so a DNS change shows up as soon as the world sees it. Blocklists are asked through their own name servers, because Spamhaus does not answer queries that come through big public resolvers like Google or Cloudflare. Each list is first asked for its test entry `127.0.0.2`, which is always listed. If that test gets no answer, the result is `ok: null` ("could not check") instead of a false "not listed".
 
 Run this after setting DNS to find what is missing before you send real mail.
 

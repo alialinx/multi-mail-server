@@ -4,8 +4,6 @@ import dns.reversename
 from . import dkim
 from .config import MAIL_HOSTNAME, SERVER_IP
 
-# Query public resolvers directly so the check reflects what the world sees,
-# not the server's own (often stale) cache right after a DNS change.
 _public = dns.resolver.Resolver(configure=False)
 _public.nameservers = ["8.8.8.8", "1.1.1.1"]
 _public.timeout = 5
@@ -42,15 +40,48 @@ def _ptr(ip):
         return []
 
 
-def _blacklisted(ip):
-    reversed_ip = ".".join(reversed(ip.split(".")))
+BLOCKLISTS = [
+    ("Spamhaus blacklist", "zen.spamhaus.org"),
+    ("Barracuda blacklist", "b.barracudacentral.org"),
+    ("SpamCop blacklist", "bl.spamcop.net"),
+]
+
+
+def _zone_resolver(zone):
+    ips = []
     try:
-        dns.resolver.resolve(f"{reversed_ip}.zen.spamhaus.org", "A")
-        return True
+        for ns in _public.resolve(zone, "NS"):
+            ips += _a(str(ns.target))
+    except Exception:
+        pass
+    if not ips:
+        return _public
+    resolver = dns.resolver.Resolver(configure=False)
+    resolver.nameservers = ips
+    resolver.timeout = 5
+    resolver.lifetime = 5
+    return resolver
+
+
+def _lookup(resolver, name):
+    try:
+        return [r.address for r in resolver.resolve(name, "A")]
     except dns.resolver.NXDOMAIN:
-        return False
+        return []
     except Exception:
         return None
+
+
+def _blacklisted(ip, zone):
+    resolver = _zone_resolver(zone)
+    test = _lookup(resolver, f"2.0.0.127.{zone}")
+    if not test or any(a.startswith("127.255.255.") for a in test):
+        return None
+    reversed_ip = ".".join(reversed(ip.split(".")))
+    answers = _lookup(resolver, f"{reversed_ip}.{zone}")
+    if answers is None or any(a.startswith("127.255.255.") for a in answers):
+        return None
+    return len(answers) > 0
 
 
 def result(name, ok, detail):
@@ -93,10 +124,11 @@ def run(domain):
         detail += f" (does not match mail hostname {MAIL_HOSTNAME})"
     results.append(result("PTR reverse DNS", bool(ptr) and confirms, detail))
 
-    listed = _blacklisted(SERVER_IP)
-    if listed is None:
-        results.append(result("Spamhaus blacklist", None, "could not check"))
-    else:
-        results.append(result("Spamhaus blacklist", not listed, "listed" if listed else "not listed"))
+    for name, zone in BLOCKLISTS:
+        listed = _blacklisted(SERVER_IP, zone)
+        if listed is None:
+            results.append(result(name, None, f"could not check {zone}"))
+        else:
+            results.append(result(name, not listed, f"{SERVER_IP} listed on {zone}" if listed else "not listed"))
 
     return results

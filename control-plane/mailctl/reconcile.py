@@ -4,7 +4,7 @@ import subprocess
 from jinja2 import Environment, FileSystemLoader
 
 from . import reload as reload_services
-from .config import CERTS_DIR, GEN_CONFIG_DIR, MAIL_HOSTNAME
+from .config import CERTS_DIR, GEN_CONFIG_DIR, MAIL_HOSTNAME, PANEL_ALLOW_IPS
 from .db import Domain, SessionLocal
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
@@ -16,8 +16,18 @@ def cert_dir(name):
 
 
 def has_cert(name):
-    d = cert_dir(name)
+    return has_host_cert(f"mail.{name}")
+
+
+def has_host_cert(hostname):
+    d = f"{CERTS_DIR}/live/{hostname}"
     return os.path.exists(f"{d}/fullchain.pem") and os.path.exists(f"{d}/privkey.pem")
+
+
+def panel_host():
+    if PANEL_ALLOW_IPS and has_host_cert(MAIL_HOSTNAME):
+        return MAIL_HOSTNAME
+    return None
 
 
 def read(path):
@@ -72,7 +82,14 @@ def reconcile_all(reload=True):
     write(f"{GEN_CONFIG_DIR}/opendkim/key.table", render("opendkim-key.table.j2", domains=all_domains))
     write(f"{GEN_CONFIG_DIR}/opendkim/signing.table", render("opendkim-signing.table.j2", domains=all_domains))
     write(f"{GEN_CONFIG_DIR}/opendkim/trusted.hosts", render("opendkim-trusted.hosts.j2", domains=all_domains))
-    write(f"{GEN_CONFIG_DIR}/traefik/dynamic.yml", render("traefik-dynamic.yml.j2", domains=certified))
+    panel = panel_host()
+    traefik_domains = [name for name in certified if f"mail.{name}" != panel]
+    write(f"{GEN_CONFIG_DIR}/traefik/dynamic.yml", render(
+        "traefik-dynamic.yml.j2",
+        domains=traefik_domains,
+        panel_host=panel,
+        panel_allow=PANEL_ALLOW_IPS,
+    ))
 
     if reload:
         reload_services.postfix_postmap()

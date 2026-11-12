@@ -38,7 +38,8 @@ Passwords are sent in the body of `POST /users` and `PUT /users/{email}/password
 ### Web panel exposes the same control as the API
 The web panel (default port 3000) reverse-proxies `/api/` to the control plane, so anyone who can reach it and log in can do everything the API can.
 - Status: **mitigated**. The panel ships no credentials; it stores only the bearer token the user gets after logging in with the admin username and password. The token is held in the browser and expires after 8 hours.
-- Also do: open the web port only to your own IP in the firewall, like the API port, and put it behind HTTPS in production so the login and token are not sent in clear text.
+- Also do: serve the panel on your mail hostname with `PANEL_ALLOW_IPS` and `ADMIN_BIND=127.0.0.1` (see [INSTALL.md](INSTALL.md)). Then it is HTTPS only, open only to the IPs you allow, and ports 3000 and 8080 are closed. If you keep the web port, open it only to your own IP in the firewall.
+- Note: the panel login has no attempt limit. The IP allow list is what stops password guessing, so do not leave the panel open to everyone.
 
 ## Availability and operations
 
@@ -83,7 +84,8 @@ Many providers block outbound port 25, which stops sending.
 
 ### Fail2ban needs host firewall access
 Fail2ban runs on the host network with `NET_ADMIN` and `NET_RAW` so it can add firewall rules. This is a privileged container that changes the host firewall.
-- Status: **accepted**. It only bans on the public mail ports, which all arrive through HAProxy on the host. It does not cover the web or API ports. On some hosts its rules can interact with Docker's own iptables rules, so verify bans work after install.
+- Status: **accepted**. It uses `iptables-allports`, so a banned IP is blocked on every host port, SSH too. Ports that Docker publishes (80, 443, and 3000/8080 if open) skip these rules, so a banned user can still open the panel. This looks like "mail and SSH are down but the web works". On some hosts its rules can interact with Docker's own iptables rules, so verify bans work after install.
+- Also do: add your own IPs, your VPN and your app servers to `ignoreip` in `config/fail2ban/jail.local`, for example `ignoreip = 127.0.0.1/8 ::1 203.0.113.7 10.8.0.0/24`, then run `docker restart fail2ban`. The Postfix jail runs in `aggressive` mode, so a mail client with a wrong setting, or a test that drops the connection after STARTTLS, can ban you within minutes. To unban, use the panel or `DELETE /fail2ban/banned/{ip}`.
 
 ### SpamAssassin is not enabled yet
 The Debian package used did not ship a standalone `spamd` binary, so SpamAssassin is currently not wired in.

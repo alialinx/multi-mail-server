@@ -20,20 +20,58 @@ http:
         - websecure
       service: noop@internal
       tls: {}
-{% endfor %}
+{% endfor %}{% if panel_host %}    panel:
+      rule: "Host(`{{ panel_host }}`)"
+      entryPoints:
+        - websecure
+      service: panel
+      middlewares:
+        - panel-allow
+        - panel-headers
+      tls: {}
+{% endif %}
   services:
     acme-web:
       loadBalancer:
         servers:
           - url: "http://acme-web:80"
+{% if panel_host %}    panel:
+      loadBalancer:
+        servers:
+          - url: "http://web:80"
+{% endif %}
   middlewares:
     https-redirect:
       redirectScheme:
         scheme: https
         permanent: true
-{% if domains %}
+{% if panel_host %}    panel-allow:
+      ipAllowList:
+        sourceRange:
+{% for ip in panel_allow %}          - "{{ ip }}"
+{% endfor %}    panel-headers:
+      headers:
+        stsSeconds: 31536000
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "no-referrer"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+          Server: ""
+{% endif %}
 tls:
-  certificates:
+  options:
+    default:
+      minVersion: VersionTLS12
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/default/fullchain.pem
+        keyFile: /certs/default/privkey.pem
+{% if domains or panel_host %}  certificates:
 {% for d in domains %}    - certFile: /certs/live/mail.{{ d }}/fullchain.pem
       keyFile: /certs/live/mail.{{ d }}/privkey.pem
-{% endfor %}{% endif %}
+{% endfor %}{% if panel_host %}    - certFile: /certs/live/{{ panel_host }}/fullchain.pem
+      keyFile: /certs/live/{{ panel_host }}/privkey.pem
+{% endif %}{% endif %}

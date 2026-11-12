@@ -8,7 +8,7 @@
 
 Docker is installed automatically by `install.sh` if it is missing.
 
-You open the firewall yourself; the installer does not touch it. Open: 25, 80, 143, 443, 465, 587, 993 to the internet, and the web port (default 3000) and API port (default 8080) only to your own IP.
+You open the firewall yourself; the installer does not touch it. Open: 25, 80, 143, 443, 465, 587, 993 to the internet, and the web port (default 3000) and API port (default 8080) only to your own IP. If you serve the panel on your mail hostname (see below), keep 3000 and 8080 closed.
 
 ## Steps
 
@@ -39,6 +39,20 @@ Then it builds the images, starts the database and API, creates the database tab
 Open `http://<server>:<WEB_PORT>/` and log in with your admin username and password. From there you manage domains, users, aliases, quota, auto-reply and certificates. The panel is a static UI served by its own nginx container; it calls the same API, proxied at `/api/`, so only the web port needs to be reachable from your browser.
 
 If you prefer raw REST, the Swagger UI is at `http://<server>:<API_PORT>/docs` (click **Authorize**, same credentials). Full endpoint list is in [API.md](API.md).
+
+### Serve the panel on your mail hostname (HTTPS)
+
+You can open the panel at `https://<MAIL_HOSTNAME>/` instead of `http://<server>:3000/`. Traefik serves it on port 443 with a Let's Encrypt certificate and lets in only the IPs you allow.
+
+1. Make sure `MAIL_HOSTNAME` (for example `mx.example.com`) has an A record pointing to your server.
+2. In `.env`, set the IPs or ranges that may open the panel, separated by commas. For example your VPN: `PANEL_ALLOW_IPS=10.8.0.0/24,203.0.113.7`
+3. In `.env`, set `ADMIN_BIND=127.0.0.1`. Ports 3000 and 8080 then listen only inside the server, so the panel is reachable only through HTTPS.
+4. Run `docker compose up -d --build api web`.
+5. Get the certificate from inside the server: log in with `curl -X POST http://127.0.0.1:8080/token -d "username=admin&password=YOUR_PASS"`, then call `curl -X POST http://127.0.0.1:8080/certs/panel -H "Authorization: Bearer <token>"`.
+
+Everyone else gets `403 Forbidden`. If `PANEL_ALLOW_IPS` is empty, the panel is not served on the hostname at all. The certificate renews with the others.
+
+With `ADMIN_BIND=127.0.0.1` the Swagger UI is only reachable from the server itself, for example through an SSH tunnel: `ssh -L 8080:127.0.0.1:8080 <server>`, then open `http://localhost:8080/docs`.
 
 The common flow:
 

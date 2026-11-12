@@ -255,6 +255,11 @@ def issue_cert(domain: str):
     return ok(service.issue_cert(domain))
 
 
+@api.post("/certs/panel")
+def issue_panel_cert():
+    return ok(service.issue_panel_cert())
+
+
 @api.post("/certs/renew")
 def renew_certs():
     return ok(service.renew_certs())

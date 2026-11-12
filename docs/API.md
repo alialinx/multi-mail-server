@@ -66,6 +66,7 @@ For a domain catch-all, use an address like `@example.com`. With `keep_copy: tru
 | Method | Path | Action |
 |---|---|---|
 | POST | /certs/issue/{domain} | issue certificate |
+| POST | /certs/panel | issue the certificate for `MAIL_HOSTNAME`, used to serve the web panel over HTTPS |
 | POST | /certs/renew | renew all certificates now |
 
 Renewal also runs automatically in the background twice a day, so you rarely need `POST /certs/renew`.

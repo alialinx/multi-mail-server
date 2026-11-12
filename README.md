@@ -34,6 +34,8 @@ The installer does not change your firewall. Open these yourself:
 | Web port (default 3000) | admin web panel, open only to your own IP |
 | API port (default 8080) | admin API, open only to your own IP |
 
+You can also serve the panel at `https://<MAIL_HOSTNAME>/` for allowed IPs only and close 3000 and 8080. See [docs/INSTALL.md](docs/INSTALL.md).
+
 ## Quick start
 
 ```

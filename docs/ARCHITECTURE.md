@@ -22,7 +22,7 @@ Each part runs in its own container. They are wired with one Docker network call
 | dovecot | IMAP on 143 and 993, and LMTP for local delivery |
 | opendkim | Signs outgoing mail with DKIM |
 | haproxy | The edge for mail ports. Terminates TLS for 465 and 993 |
-| traefik | The edge for web ports 80 and 443 |
+| traefik | The edge for web ports 80 and 443. Can also serve the web panel on `MAIL_HOSTNAME` for allowed IPs only |
 | acme-web | A tiny nginx that serves Let's Encrypt HTTP challenges |
 | certbot | Gets and renews all certificates |
 | fail2ban | Bans IPs that brute-force SMTP or IMAP login |
@@ -55,14 +55,14 @@ The API reads the active domains and writes these files into the shared `gen-con
 | `dovecot/sni.conf` | Dovecot per-domain TLS via `local_name` blocks |
 | `haproxy/mail-465.crtlist`, `haproxy/mail-993.crtlist` | HAProxy SNI certificates |
 | `opendkim/key.table`, `signing.table`, `trusted.hosts` | OpenDKIM signing |
-| `traefik/dynamic.yml` | Traefik routers and certificates |
+| `traefik/dynamic.yml` | Traefik routers and certificates, plus the panel router, IP allow list and security headers when `PANEL_ALLOW_IPS` is set and the `MAIL_HOSTNAME` certificate exists |
 | `certs/*.pem` | Combined cert and key files for HAProxy |
 
 After writing, it reloads opendkim, postfix, dovecot, and haproxy. Traefik picks up its file on its own.
 
 ## Certificates
 
-One certbot container gets all certificates with the HTTP-01 challenge. Traefik routes the challenge path to the `acme-web` nginx, which serves the challenge files. Certbot writes certificates to the shared `certs` volume under `/certs/live/mail.<domain>/`. HAProxy, Dovecot, Postfix, and Traefik all read from there.
+One certbot container gets all certificates with the HTTP-01 challenge. Traefik routes the challenge path to the `acme-web` nginx, which serves the challenge files. Certbot writes certificates to the shared `certs` volume under `/certs/live/mail.<domain>/`. The panel certificate goes to `/certs/live/<MAIL_HOSTNAME>/` and renews with the rest. HAProxy, Dovecot, Postfix, and Traefik all read from there.
 
 There is one self-signed default certificate at `/certs/default`. It is the fallback when a connection does not match any domain.
 

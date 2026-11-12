@@ -11,14 +11,18 @@ CONFIG_ARGS = [
 
 
 def issue(domain):
+    issue_host(f"mail.{domain}")
+
+
+def issue_host(hostname):
     cmd = [
         "docker", "exec", "certbot", "certbot", "certonly",
         "--non-interactive", "--agree-tos",
         "--email", ACME_EMAIL,
         "--server", ACME_SERVER,
-        "--cert-name", f"mail.{domain}",
+        "--cert-name", hostname,
         *CONFIG_ARGS,
-        "-d", f"mail.{domain}",
+        "-d", hostname,
     ]
     subprocess.run(cmd, check=True)
 

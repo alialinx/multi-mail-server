@@ -6,6 +6,7 @@ from . import (
     bans, certs, checks, dkim, dns, logs, mailqueue, mailstats,
     reconcile, sieve, stats, status, usage, validators,
 )
+from .config import MAIL_HOSTNAME
 from .db import Alias, Domain, SessionLocal, User, init_db
 from .passwords import hash_password
 
@@ -298,6 +299,12 @@ def issue_cert(name):
     certs.issue(name)
     reconcile.reconcile_all()
     return {"domain": name, "issued": True}
+
+
+def issue_panel_cert():
+    certs.issue_host(MAIL_HOSTNAME)
+    reconcile.reconcile_all()
+    return {"hostname": MAIL_HOSTNAME, "issued": True, "panel_enabled": reconcile.panel_host() is not None}
 
 
 def renew_certs():
